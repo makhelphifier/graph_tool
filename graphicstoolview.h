@@ -37,7 +37,6 @@ protected:
     void mouseReleaseEvent(QMouseEvent *event) override;
     void keyReleaseEvent(QKeyEvent *event) override;
 
-    // 新增的函数声明
     void handleNoneModePress(QMouseEvent *event);
     bool checkHandleHit(const QPointF &scenePos);
     bool checkSelectedGroupHit(const QPointF &scenePos, qreal tolerance);
@@ -50,6 +49,10 @@ protected:
     void handleHandleRelease();
     void handleGroupRelease();
 
+    void copySelectedItems();
+    void pasteCopiedItems();
+
+
 private:
     bool isDrawingLine = false;
     QPointF startPoint;
@@ -57,6 +60,8 @@ private:
     QGraphicsLineItem *previewLine = nullptr;
     DrawingMode currentMode;
     QList<QGraphicsItem*> selectedItems;
+    QList<QGraphicsItem*> copiedItems; // 存储复制的图形项
+
     HandleItem* draggedHandle = nullptr; // 存储当前正在拖动的端点
     QGraphicsItem* draggedItem = nullptr; // 存储当前正在拖动的项
 

@@ -66,6 +66,7 @@ void GraphicsToolView::wheelEvent(QWheelEvent *event)
 
 
 
+
 void GraphicsToolView::keyPressEvent(QKeyEvent *event)
 {
     if (event->key() == Qt::Key_Escape) {
@@ -84,8 +85,19 @@ void GraphicsToolView::keyPressEvent(QKeyEvent *event)
             qDebug() << "Shift pressed. Restricting line to horizontal or vertical.";
         }
     }
+    // 添加复制 (Ctrl+C) 和粘贴 (Ctrl+V) 快捷键
+    if (event->modifiers() & Qt::ControlModifier) {
+        if (event->key() == Qt::Key_C) {
+            copySelectedItems();
+        } else if (event->key() == Qt::Key_V) {
+            pasteCopiedItems();
+        }
+    }
     QGraphicsView::keyPressEvent(event);
 }
+
+
+
 
 void GraphicsToolView::keyReleaseEvent(QKeyEvent *event)
 {
@@ -389,3 +401,45 @@ void GraphicsToolView::cleanupSelection()
     isDraggingSelectionGroup = false; // 重置拖动组状态
 
 }
+
+
+
+void GraphicsToolView::copySelectedItems()
+{
+    qDebug() << "Copying selected items.";
+    copiedItems.clear(); // 清空之前的复制内容
+
+    for (QGraphicsItem* item : selectedItems) {
+        // 可以扩展支持其他类型的图形项
+        copiedItems.append(item); // 存储复制的项
+    }
+    qDebug() << "Total copied items:" << copiedItems.size();
+}
+
+void GraphicsToolView::pasteCopiedItems()
+{
+    qDebug() << "Pasting copied items.";
+    if (copiedItems.isEmpty()) {
+        qDebug() << "No items to paste.";
+        return;
+    }
+
+
+    // 偏移量，用于避免粘贴的图形与原图形完全重叠
+    const QPointF offset =QPointF(20.0,20.0) ;
+    for (QGraphicsItem* item : selectedItems) {
+        QPointF newItemPos = item->pos() + offset;
+        item->setPos(newItemPos);
+        QGraphicsItem* newItem =item;
+        scene()->addItem(newItem);
+        selectedItems.append(newItem);
+        // newItem->setSelectedState(true);
+
+
+    }
+
+    // 清空当前选中项，并将粘贴的项设为选中状态
+    cleanupSelection();
+    qDebug() << "Total pasted items:" << selectedItems.size();
+}
+
