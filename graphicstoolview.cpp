@@ -93,10 +93,18 @@ void GraphicsToolView::keyPressEvent(QKeyEvent *event)
             pasteCopiedItems();
         }
     }
+
+    if ((event->modifiers() & Qt::ControlModifier) && (event->modifiers() & Qt::ShiftModifier)) {
+        if (event->key() == Qt::Key_C) {
+            qDebug() << "Ctrl + Shift + C detected. Copying selected items.";
+            copySelectedItems();
+        }
+    }
+
+
+
     QGraphicsView::keyPressEvent(event);
 }
-
-
 
 
 void GraphicsToolView::keyReleaseEvent(QKeyEvent *event)
@@ -428,9 +436,9 @@ void GraphicsToolView::pasteCopiedItems()
     // 偏移量，用于避免粘贴的图形与原图形完全重叠
     const QPointF offset =QPointF(20.0,20.0) ;
     for (QGraphicsItem* item : selectedItems) {
-        QPointF newItemPos = item->pos() + offset;
-        item->setPos(newItemPos);
         QGraphicsItem* newItem =item;
+        QPointF newItemPos = item->pos() + offset;
+        newItem->setPos(newItemPos);
         scene()->addItem(newItem);
         selectedItems.append(newItem);
         // newItem->setSelectedState(true);
