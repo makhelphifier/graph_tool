@@ -14,7 +14,9 @@ GraphicsToolView::GraphicsToolView(QGraphicsScene *scene, QWidget *parent)
     isDragging(false),
     previewLine(nullptr),
     draggedHandle(nullptr),
-    draggedItem(nullptr)
+    draggedItem(nullptr),
+    isShiftPressed(false),
+    isCtrlPressedForCopy(false)
 {
     setRenderHint(QPainter::Antialiasing);
 }
@@ -47,6 +49,10 @@ void GraphicsToolView::mousePressEvent(QMouseEvent *event)
 {
     qDebug() << "mousePressEvent of GraphicsToolView";
 
+    // 记录是否按住 Ctrl 键
+    bool isCtrlPressed = event->modifiers() & Qt::ControlModifier;
+
+
     if (currentMode == DrawingMode::None) {
         handleNoneModePress(event);
     } else if (currentMode == DrawingMode::Line) {
@@ -76,15 +82,6 @@ void GraphicsToolView::wheelEvent(QWheelEvent *event)
         // Zoom out
         scale(1.0 / scaleFactor, 1.0 / scaleFactor);
     }
-
-    // Optional: Prevent the event from being propagated further if you've handled it completely.
-    // 如果不希望事件继续传播到父控件，可以调用 accept() 或 ignore()。
-    // event->accept(); // 表示事件已被处理
-    // event->ignore(); // 表示事件未被处理，继续传播
-
-    // Call the base class implementation to ensure other default handling is done (if any).
-    // 如果 QGraphicsView 的基类有默认的滚轮事件处理，建议调用它。
-    // QGraphicsView::wheelEvent(event); // 如果 GraphicsToolView 直接继承自 QGraphicsView
 }
 
 
@@ -100,58 +97,18 @@ void GraphicsToolView::keyPressEvent(QKeyEvent *event)
             qDebug() << "Esc pressed. Clearing selection.";
             cleanupSelection();
         }
-        event->accept(); // Accept the event to prevent further processing
-        return; // Exit the function after handling
+        event->accept();
+        return;
     }
 
-    // Handle Shift key for line drawing restriction
     if (event->key() == Qt::Key_Shift) {
         if (currentMode == DrawingMode::Line) {
             isShiftPressed = true;
             qDebug() << "Shift pressed. Restricting line to horizontal or vertical.";
         }
-        // No event->accept() here, allow Shift to be combined with other keys
-    }
-
-    // Handle Copy (Ctrl+C) and Paste (Ctrl+V) shortcuts
-    // Check for specific combinations first to avoid double handling
-
-    // Handle Ctrl+Shift+C
-    if ((event->modifiers() & Qt::ControlModifier) && (event->modifiers() & Qt::ShiftModifier) && event->key() == Qt::Key_C) {
-        qDebug() << "Ctrl + Shift + C detected. Copying selected items.";
-        copySelectedItems();
-        event->accept();
-        return;
-    }
-
-    // Handle Ctrl+Shift+V
-    if ((event->modifiers() & Qt::ControlModifier) && (event->modifiers() & Qt::ShiftModifier) && event->key() == Qt::Key_V) {
-        qDebug() << "Ctrl + Shift + V detected. Pasting copied items (Ctrl+Shift+V).";
-        pasteCopiedItems();
-        event->accept();
-        return;
-    }
-
-    // Handle Ctrl+C
-    // 移除排除 Shift 的条件，只检查是否按下了 Ctrl 和 C
-    if ((event->modifiers() & Qt::ControlModifier) && event->key() == Qt::Key_C) {
-        qDebug() << "Ctrl + C detected. Copying selected items.";
-        copySelectedItems();
-        event->accept();
-        return;
-    }
-
-    // Handle Ctrl+V
-    // 移除排除 Shift 的条件，只检查是否按下了 Ctrl 和 V
-    if ((event->modifiers() & Qt::ControlModifier) && event->key() == Qt::Key_V) {
-        qDebug() << "Ctrl + V detected. Pasting copied items (Ctrl+V).";
-        pasteCopiedItems();
-        event->accept();
-        return;
     }
 
 
-    // Call the base class implementation for unhandled events
     QGraphicsView::keyPressEvent(event);
 }
 
@@ -179,6 +136,9 @@ void GraphicsToolView::handleNoneModePress(QMouseEvent *event)
 
     // 检查是否点击了已选中的图形（以便拖动整个选中组）
     if (checkSelectedGroupHit(scenePos, tolerance)) {
+        // 在确认开始拖动选中组后，立即设置 Ctrl 键状态
+        this->isCtrlPressedForCopy = event->modifiers() & Qt::ControlModifier;
+        qDebug() << "Ctrl key state for copy during drag: " << isCtrlPressedForCopy;
         return; // 如果点击了选中组，直接返回
     }
 
@@ -309,6 +269,12 @@ void GraphicsToolView::handleLineModePress(QMouseEvent *event)
 
 void GraphicsToolView::mouseMoveEvent(QMouseEvent *event)
 {
+
+    QPointF scenePos = mapToScene(event->pos());
+
+    // 更新光标样式
+    updateCursorBasedOnPosition(scenePos);
+
     if (currentMode == DrawingMode::Line && !startPoint.isNull() && isDragging) {
         handleLineModeMove(event);
     } else if (currentMode == DrawingMode::None && draggedHandle && draggedItem) {
@@ -317,6 +283,33 @@ void GraphicsToolView::mouseMoveEvent(QMouseEvent *event)
         handleGroupMove(event);
     }
 }
+
+void GraphicsToolView::updateCursorBasedOnPosition(const QPointF &scenePos)
+{
+    bool isOverSelectedItem = false;
+    qreal tolerance = 10.0; // 容差，扩展矩形区域，便于选中
+
+    // 检查鼠标是否在选中项的矩形区域内
+    for (QGraphicsItem* item : selectedItems) {
+        QRectF boundingRect = item->boundingRect();
+        boundingRect.adjust(-tolerance, -tolerance, tolerance, tolerance);
+        QRectF sceneRect = item->mapToScene(boundingRect).boundingRect();
+        if (sceneRect.contains(scenePos)) {
+            isOverSelectedItem = true;
+            break;
+        }
+    }
+
+    // 根据是否在选中项上以及当前模式设置光标样式
+    if (isOverSelectedItem && currentMode == DrawingMode::None) {
+        setCursor(Qt::SizeAllCursor); // 横竖四个箭头光标
+    } else if (currentMode == DrawingMode::None) {
+        setCursor(Qt::ArrowCursor); // 不在选中项区域内，恢复默认光标
+    }
+    // 其他模式下的光标样式（如 DrawingMode::Line）保持不变
+    // 如果需要，可以在这里添加其他模式的逻辑
+}
+
 
 void GraphicsToolView::handleLineModeMove(QMouseEvent *event)
 {
@@ -431,8 +424,6 @@ void GraphicsToolView::mouseReleaseEvent(QMouseEvent *event)
 
 void GraphicsToolView::handleLineModeRelease(QMouseEvent *event)
 {
-    endPoint = mapToScene(event->pos());
-
     // 如果按住 Shift 键，限制方向
     if (isShiftPressed) {
         qreal dx = qAbs(endPoint.x() - startPoint.x());
@@ -442,13 +433,6 @@ void GraphicsToolView::handleLineModeRelease(QMouseEvent *event)
         } else {
             endPoint.setX(startPoint.x());
         }
-    }
-    qDebug() << "End Point set to:" << endPoint;
-    qDebug() << "Both points are set - Start Point:" << startPoint << ", End Point:" << endPoint;
-    if (startPoint != endPoint) {
-        QGraphicsLineItem *line = new EditableLineItem(startPoint, endPoint);
-        scene()->addItem(line);
-        cleanupDrawing();
     }
 }
 
@@ -462,7 +446,37 @@ void GraphicsToolView::handleHandleRelease()
 void GraphicsToolView::handleGroupRelease()
 {
     qDebug() << "Selected group drag released.";
+    qDebug() << "Ctrl key state for copy: " << isCtrlPressedForCopy;
+    if (isCtrlPressedForCopy && !selectedItems.isEmpty()) {
+        qDebug() << "Ctrl key was pressed during drag. Copying selected items.";
+        QList<QGraphicsItem*> newItems;
+        for (QGraphicsItem* item : selectedItems) {
+            if (EditableLineItem* editableLine = dynamic_cast<EditableLineItem*>(item)) {
+                QGraphicsItem* newItem = editableLine->clone();
+                if (newItem) {
+                    // 添加一个偏移量，避免新复制的项与原项完全重叠
+                    newItem->setPos(item->pos() + QPointF(20, 20));
+                    scene()->addItem(newItem);
+                    newItems.append(newItem);
+                    qDebug() << "Copied item at position: " << newItem->pos();
+                }
+            }
+            // 可以添加对其他类型的图形项的支持
+        }
+        // 更新选中项为新复制的项（可选）
+        cleanupSelection();
+        for (QGraphicsItem* newItem : newItems) {
+            if (EditableLineItem* newEditableLine = dynamic_cast<EditableLineItem*>(newItem)) {
+                newEditableLine->setSelectedState(true);
+                selectedItems.append(newItem);
+            }
+        }
+        qDebug() << "Copied items during drag. Total new selected items: " << selectedItems.size();
+    } else {
+        qDebug() << "No copy performed. Ctrl pressed: " << isCtrlPressedForCopy << ", Selected items count: " << selectedItems.size();
+    }
     isDraggingSelectionGroup = false;
+    isCtrlPressedForCopy = false; // 重置状态
 }
 
 

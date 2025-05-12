@@ -54,7 +54,9 @@ protected:
 
 
 
+    void updateCursorBasedOnPosition(const QPointF &scenePos);
 private:
+    bool isCtrlPressedForCopy; // 用于记录拖动时是否按住 Ctrl 键以进行复制
     bool isDrawingLine = false;
     QPointF startPoint;
     QPointF endPoint;
