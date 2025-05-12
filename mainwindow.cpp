@@ -212,6 +212,11 @@ void MainWindow::initMenu(){
     connect(graphManagementAction, &QAction::triggered, this, &MainWindow::graphManagementWindow);
     connect(newAction, &QAction::triggered, this, &MainWindow::newFileWindow);
 
+    // 添加连接：将复制动作的 triggered 信号连接到 graphicsView 的 copySelectedItems 槽
+    connect(copyAction, &QAction::triggered, graphicsView, &GraphicsToolView::copySelectedItems);
+    // 添加连接：将粘贴动作的 triggered 信号连接到 graphicsView 的 pasteCopiedItems 槽
+    connect(pasteAction, &QAction::triggered, graphicsView, &GraphicsToolView::pasteCopiedItems);
+
 }
 
 MainWindow::~MainWindow()

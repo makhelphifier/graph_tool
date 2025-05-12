@@ -29,6 +29,9 @@ public:
     GraphicsToolView(QGraphicsScene *scene, QWidget *parent = nullptr);
     void setDrawingMode(DrawingMode mode);
 
+public slots:
+    void copySelectedItems();
+    void pasteCopiedItems();
 protected:
     void wheelEvent(QWheelEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
@@ -49,8 +52,6 @@ protected:
     void handleHandleRelease();
     void handleGroupRelease();
 
-    void copySelectedItems();
-    void pasteCopiedItems();
 
 
 private:
@@ -69,6 +70,7 @@ private:
     QPointF lastDragPos; // 记录上次拖动的位置，用于计算偏移量
     bool isDragging; // 标志用户是否正在拖动
     QPointF dragStartPosition; // 拖动开始时的鼠标位置
+    QPointF fixedRotationCenter; // 用于保存旋转开始时的旋转中心位置
 
     void cleanupDrawing();
     void cleanupSelection();
