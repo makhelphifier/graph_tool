@@ -16,10 +16,48 @@ GraphicsToolView::GraphicsToolView(QGraphicsScene *scene, QWidget *parent)
     draggedHandle(nullptr),
     draggedItem(nullptr),
     isShiftPressed(false),
-    isCtrlPressedForCopy(false)
+    isCtrlPressedForCopy(false),
+    drawingColor(Qt::black) // 默认绘图颜色为黑色
+
 {
     setRenderHint(QPainter::Antialiasing);
+    colorSelector = new ColorSelectorPopup(this);
+    connect(colorSelector, &ColorSelectorPopup::colorSelected, this, &GraphicsToolView::onColorSelected);
+    connect(colorSelector, &ColorSelectorPopup::closePopup, colorSelector, &ColorSelectorPopup::close);
+
 }
+
+// 设置当前绘图颜色
+void GraphicsToolView::setDrawingColor(const QColor &color)
+{
+    drawingColor = color;
+    qDebug() << "Drawing color set to:" << color.name();
+}
+
+// 获取当前绘图颜色
+QColor GraphicsToolView::currentDrawingColor() const
+{
+    return drawingColor;
+}
+// 显示颜色选择器
+void GraphicsToolView::showColorSelector()
+{
+    if (colorSelector) {
+        // 将颜色选择器显示在视图的中心位置或鼠标位置附近
+        QPoint viewCenter = viewport()->rect().center();
+        QPoint globalPos = mapToGlobal(viewCenter);
+        colorSelector->move(globalPos);
+        colorSelector->show();
+    }
+}
+
+// 处理颜色选择信号
+void GraphicsToolView::onColorSelected(const QColor &color)
+{
+    setDrawingColor(color);
+    qDebug() << "Color selected from popup:" << color.name();
+}
+
 
 void GraphicsToolView::setDrawingMode(DrawingMode mode)
 {
@@ -260,6 +298,10 @@ void GraphicsToolView::handleLineModePress(QMouseEvent *event)
         qDebug() << "End Point set to:" << endPoint;
         qDebug() << "Both points are set - Start Point:" << startPoint << ", End Point:" << endPoint;
         QGraphicsLineItem *line = new EditableLineItem(startPoint, endPoint);
+        // 应用当前绘图颜色
+        QPen pen = line->pen();
+        pen.setColor(drawingColor);
+        line->setPen(pen);
         scene()->addItem(line);
         qDebug() << "Line created from" << startPoint << "to" << endPoint;
         qDebug() << "Drawing completed. Resetting points.";
@@ -334,11 +376,25 @@ void GraphicsToolView::handleLineModeMove(QMouseEvent *event)
         previewLine->setLine(startPoint.x(), startPoint.y(), endPoint.x(), endPoint.y());
     } else {
         previewLine = new EditableLineItem(startPoint, endPoint);
+        // 应用当前绘图颜色到预览线段
+        QPen pen = previewLine->pen();
+        pen.setColor(drawingColor);
+        previewLine->setPen(pen);
         scene()->addItem(previewLine);
     }
     qDebug() << "End Point set to:" << endPoint;
 }
 
+void GraphicsToolView::applyColorToSelectedItems(const QColor &color)
+{
+    for (QGraphicsItem* item : selectedItems) {
+        if (EditableLineItem* editableLine = dynamic_cast<EditableLineItem*>(item)) {
+            QPen pen = editableLine->pen();
+            pen.setColor(color);
+            editableLine->setPen(pen);
+        }
+    }
+}
 
 
 void GraphicsToolView::handleHandleMove(QMouseEvent *event)
@@ -524,16 +580,11 @@ void GraphicsToolView::copySelectedItems()
 {
     qDebug() << "Copying selected items.";
     copiedItems.clear(); // 清空之前的复制内容
-
     for (QGraphicsItem* item : selectedItems) {
         // 检查当前项是否是 EditableLineItem
         if (EditableLineItem* editableLine = dynamic_cast<EditableLineItem*>(item)) {
-            // 进一步检查这个 EditableLineItem 是否是顶层项
-            // 也就是说，它的父项是否为 nullptr，或者父项不是另一个 EditableLineItem
-            // 这样可以避免复制作为另一个 EditableLineItem 子项的 EditableLineItem (如果存在这种情况)
-            // 更重要的是，这可以确保我们不会复制 EditableLineItem 的 handles，因为 handles 的父项就是 EditableLineItem
             if (item->parentItem() == nullptr || dynamic_cast<EditableLineItem*>(item->parentItem()) == nullptr) {
-                copiedItems.append(item); // 将顶层的 EditableLineItem 添加到复制列表
+                copiedItems.append(item);
             }
         }
     }

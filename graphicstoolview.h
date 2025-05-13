@@ -8,6 +8,9 @@
 #include <QPointF>
 #include <QMouseEvent>
 #include <QKeyEvent>
+#include "colorselectorpopup.h"
+
+
 class HandleItem; // 前向声明
 
 class GraphicsToolView : public QGraphicsView
@@ -29,9 +32,13 @@ public:
     GraphicsToolView(QGraphicsScene *scene, QWidget *parent = nullptr);
     void setDrawingMode(DrawingMode mode);
 
+    void applyColorToSelectedItems(const QColor &color);
 public slots:
     void copySelectedItems();
     void pasteCopiedItems();
+    void showColorSelector(); // 显示颜色选择器
+    void onColorSelected(const QColor &color); // 处理颜色选择信号
+
 protected:
     void wheelEvent(QWheelEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
@@ -51,11 +58,15 @@ protected:
     void handleLineModeRelease(QMouseEvent *event);
     void handleHandleRelease();
     void handleGroupRelease();
-
+    void setDrawingColor(const QColor &color); // 设置当前绘图颜色
+    QColor currentDrawingColor() const; // 获取当前绘图颜色
 
 
     void updateCursorBasedOnPosition(const QPointF &scenePos);
 private:
+    QColor drawingColor; // 当前绘图颜色
+    ColorSelectorPopup *colorSelector; // 颜色选择器弹窗
+
     bool isCtrlPressedForCopy; // 用于记录拖动时是否按住 Ctrl 键以进行复制
     bool isDrawingLine = false;
     QPointF startPoint;
