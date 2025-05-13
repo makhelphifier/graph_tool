@@ -88,6 +88,7 @@ private:
     bool isDragging; // 标志用户是否正在拖动
     QPointF dragStartPosition; // 拖动开始时的鼠标位置
     QPointF fixedRotationCenter; // 用于保存旋转开始时的旋转中心位置
+    bool closePolylineOnFinish = false; // 是否在结束时闭合折线
 
     void cleanupDrawing();
     void cleanupSelection();
@@ -97,6 +98,7 @@ private:
     bool isDrawingPolyline = false; // 是否正在绘制折线
     QVector<QPointF> polylinePoints; // 存储折线顶点
     EditablePolylineItem *currentPolyline = nullptr; // 当前正在绘制的折线对象
+    int draggedHandleIndex;
 };
 
 #endif // GRAPHICSTOOLVIEW_H

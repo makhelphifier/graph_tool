@@ -18,7 +18,9 @@ GraphicsToolView::GraphicsToolView(QGraphicsScene *scene, QWidget *parent)
     isShiftPressed(false),
     isCtrlPressedForCopy(false),
     drawingColor(Qt::black) ,// 默认绘图颜色为黑色,
-    isDrawingPolyline(false)
+    isDrawingPolyline(false),
+    draggedHandleIndex(-1),
+    closePolylineOnFinish(false)
 
 {
     setRenderHint(QPainter::Antialiasing);
@@ -170,6 +172,14 @@ void GraphicsToolView::keyPressEvent(QKeyEvent *event)
             isShiftPressed = true;
             qDebug() << "Shift pressed. Restricting line to horizontal or vertical.";
         }
+    }else if (event->key() == Qt::Key_C) {
+        // C 键切换闭合折线状态
+        if (currentMode == DrawingMode::Polyline && isDrawingPolyline) {
+            closePolylineOnFinish = !closePolylineOnFinish;
+            qDebug() << "C pressed. Polyline will" << (closePolylineOnFinish ? "close" : "not close") << "on finish.";
+            event->accept();
+            return;
+        }
     }
 
 
@@ -184,23 +194,22 @@ void GraphicsToolView::keyReleaseEvent(QKeyEvent *event)
     }
     QGraphicsView::keyReleaseEvent(event);
 }
-
 void GraphicsToolView::finishPolyline()
 {
     if (isDrawingPolyline) {
         if (polylinePoints.size() < 2) {
             qDebug() << "Polyline has less than 2 points, discarding.";
-            // 如果只有1个点或没有点，则不创建折线
-            for (EditableLineItem* segment : polylineSegments) {
-                scene()->removeItem(segment);
-                delete segment;
+            if (currentPolyline) {
+                scene()->removeItem(currentPolyline);
+                delete currentPolyline;
+                currentPolyline = nullptr;
             }
         } else {
             qDebug() << "Polyline drawing finished with" << polylinePoints.size() << "points.";
+            // 保留 currentPolyline 作为最终对象
         }
         // 清理状态
         polylinePoints.clear();
-        polylineSegments.clear();
         isDrawingPolyline = false;
         isDragging = false;
         if (previewLine) {
@@ -212,6 +221,7 @@ void GraphicsToolView::finishPolyline()
         setDrawingMode(DrawingMode::None); // 可选：绘制完成后返回无模式
     }
 }
+
 
 
 void GraphicsToolView::handlePolylineModePress(QMouseEvent *event)
@@ -237,22 +247,21 @@ void GraphicsToolView::handlePolylineModePress(QMouseEvent *event)
         polylinePoints.append(scenePos);
         isDrawingPolyline = true;
         isDragging = true;
-    } else {
+    }else {
         // 添加新的顶点
         qDebug() << "Adding polyline point at:" << scenePos;
         polylinePoints.append(scenePos);
-        // 创建从上一个点到当前点的线段（作为最终线段的一部分）
-        if (polylinePoints.size() >= 2) {
-            QPointF start = polylinePoints[polylinePoints.size() - 2];
-            QPointF end = polylinePoints.last();
-            EditableLineItem *segment = new EditableLineItem(start, end);
-            QPen pen = segment->pen();
-            pen.setColor(drawingColor);
-            segment->setPen(pen);
-            scene()->addItem(segment);
-            polylineSegments.append(segment);
-            qDebug() << "Added polyline segment from" << start << "to" << end;
+        // 更新或创建折线对象
+        if (currentPolyline) {
+            scene()->removeItem(currentPolyline);
+            delete currentPolyline;
         }
+        currentPolyline = new EditablePolylineItem(polylinePoints);
+        QPen pen = currentPolyline->pen();
+        pen.setColor(drawingColor);
+        currentPolyline->setPen(pen);
+        scene()->addItem(currentPolyline);
+        qDebug() << "Updated polyline with" << polylinePoints.size() << "points.";
     }
 }
 
@@ -372,7 +381,6 @@ bool GraphicsToolView::checkSelectedGroupHit(const QPointF &scenePos, qreal tole
     }
     return false;
 }
-
 void GraphicsToolView::handleItemSelection(const QPointF &scenePos, qreal tolerance, bool isMultiSelect)
 {
     QList<QGraphicsItem*> items = scene()->items();
@@ -388,6 +396,8 @@ void GraphicsToolView::handleItemSelection(const QPointF &scenePos, qreal tolera
                     selectedItems.append(item);
                     if (EditableLineItem* editableLine = dynamic_cast<EditableLineItem*>(item)) {
                         editableLine->setSelectedState(true);
+                    } else if (EditablePolylineItem* editablePolyline = dynamic_cast<EditablePolylineItem*>(item)) {
+                        editablePolyline->setSelectedState(true);
                     }
                     qDebug() << "Item added to selection (Multi-Select) at position:" << scenePos;
                     qDebug() << "Total selected items:" << selectedItems.size();
@@ -397,6 +407,8 @@ void GraphicsToolView::handleItemSelection(const QPointF &scenePos, qreal tolera
                 selectedItems.append(item);
                 if (EditableLineItem* editableLine = dynamic_cast<EditableLineItem*>(item)) {
                     editableLine->setSelectedState(true);
+                } else if (EditablePolylineItem* editablePolyline = dynamic_cast<EditablePolylineItem*>(item)) {
+                    editablePolyline->setSelectedState(true);
                 }
                 qDebug() << "Item selected (Single-Select) at position:" << scenePos;
             }
@@ -509,7 +521,6 @@ void GraphicsToolView::handleLineModeMove(QMouseEvent *event)
     }
     qDebug() << "End Point set to:" << endPoint;
 }
-
 void GraphicsToolView::applyColorToSelectedItems(const QColor &color)
 {
     for (QGraphicsItem* item : selectedItems) {
@@ -517,6 +528,10 @@ void GraphicsToolView::applyColorToSelectedItems(const QColor &color)
             QPen pen = editableLine->pen();
             pen.setColor(color);
             editableLine->setPen(pen);
+        } else if (EditablePolylineItem* editablePolyline = dynamic_cast<EditablePolylineItem*>(item)) {
+            QPen pen = editablePolyline->pen();
+            pen.setColor(color);
+            editablePolyline->setPen(pen);
         }
     }
 }
@@ -678,16 +693,15 @@ void GraphicsToolView::cleanupDrawing()
     endPoint = QPointF();
     // 重置折线状态
     polylinePoints.clear();
-    for (EditableLineItem* segment : polylineSegments) {
-        scene()->removeItem(segment);
-        delete segment;
+    if (currentPolyline) {
+        scene()->removeItem(currentPolyline);
+        delete currentPolyline;
+        currentPolyline = nullptr;
     }
-    polylineSegments.clear();
     isDrawingPolyline = false;
     // 重置拖动状态
     isDragging = false;
 }
-
 
 void GraphicsToolView::cleanupSelection()
 {

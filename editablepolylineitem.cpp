@@ -21,7 +21,11 @@ EditablePolylineItem::~EditablePolylineItem()
         }
     }
 }
-
+void EditablePolylineItem::setPen(const QPen &pen)
+{
+    linePen = pen;
+    update();
+}
 EditablePolylineItem* EditablePolylineItem::clone() const
 {
     EditablePolylineItem* newItem = new EditablePolylineItem(points);
@@ -133,8 +137,11 @@ void EditablePolylineItem::updateHandlesPosition()
     }
 }
 
-void EditablePolylineItem::setPen(const QPen &pen)
+
+void EditablePolylineItem::setClosed(bool closed)
 {
-    linePen = pen;
+    isClosed_ = closed;
     update();
+    qDebug() << "Polyline set to" << (closed ? "closed" : "open");
 }
+
