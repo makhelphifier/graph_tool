@@ -33,6 +33,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         graphicstoolview.h graphicstoolview.cpp
         editablelineitem.h editablelineitem.cpp
         handleitem.h handleitem.cpp
+        editablepolylineitem.h editablepolylineitem.cpp
 
     )
 # Define target properties for Android with Qt 6 as:

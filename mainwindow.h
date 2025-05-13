@@ -43,7 +43,7 @@ public slots:
     void displayNewImage(const QString &imageName);
 
 private slots: // *** 新增：私有槽 ***
-    void onLineColorSelected(const QColor &color);
+    void onColorSelected(const QColor &color);
     void closeColorPopup(); // 用于关闭弹窗的槽
 
 

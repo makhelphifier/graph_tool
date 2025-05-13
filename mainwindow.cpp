@@ -50,9 +50,9 @@ MainWindow::MainWindow(QWidget *parent)
 
     QPushButton *drawPolylineButton = new QPushButton("画折线");
     toolBar->addWidget(drawPolylineButton);
-    // connect(drawPolylineButton, &QPushButton::clicked, this, [=]() {
-    //     imageCanvas->setDrawingMode(ImageCanvas::DrawingMode::Polyline);
-    // });
+    connect(drawPolylineButton, &QPushButton::clicked, this, [=]() {
+        graphicsView->setDrawingMode(GraphicsToolView::DrawingMode::Polyline);
+    });
     QPushButton *selectButton = new QPushButton("取消绘制");
     toolBar->addWidget(selectButton);
     connect(selectButton, &QPushButton::clicked, this, [=]() {
@@ -92,8 +92,11 @@ MainWindow::MainWindow(QWidget *parent)
     toolBar->addWidget(lineColorButton);
 
     colorPopup = new ColorSelectorPopup(this);
-    connect(colorPopup, &ColorSelectorPopup::colorSelected, this, &MainWindow::onLineColorSelected);
+    connect(colorPopup, &ColorSelectorPopup::colorSelected, this, &MainWindow::onColorSelected);
     connect(colorPopup, &ColorSelectorPopup::closePopup, this, &MainWindow::closeColorPopup);
+    // colorPopup = new ColorSelectorPopup(this);
+    // connect(colorPopup, &ColorSelectorPopup::colorSelected, this, &GraphicsToolView::onColorSelected);
+    // connect(colorPopup, &ColorSelectorPopup::closePopup, colorPopup, &ColorSelectorPopup::close);
 
     QMenu *colorMenu = new QMenu(lineColorButton);
     QWidgetAction *colorWidgetAction = new QWidgetAction(colorMenu);
@@ -103,13 +106,13 @@ MainWindow::MainWindow(QWidget *parent)
     lineColorButton->setMenu(colorMenu);
 }
 
-void MainWindow::onLineColorSelected(const QColor &color)
+void MainWindow::onColorSelected(const QColor &color)
 {
     if (color.isValid()) {
         currentLineColor = color;
         qDebug() << "MainWindow: Color selected -" << color.name();
-        if(imageCanvas) {
-            imageCanvas->setCurrentPenColor(currentLineColor);
+        if(graphicsView) {
+            graphicsView->setDrawingColor(currentLineColor);
         }
         updateLineColorButtonIcon();
     }

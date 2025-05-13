@@ -9,10 +9,11 @@
 #include <QMouseEvent>
 #include <QKeyEvent>
 #include "colorselectorpopup.h"
+#include "editablepolylineitem.h"
 
 
 class HandleItem; // 前向声明
-
+class EditableLineItem;
 class GraphicsToolView : public QGraphicsView
 {
     Q_OBJECT
@@ -31,6 +32,9 @@ public:
     };
     GraphicsToolView(QGraphicsScene *scene, QWidget *parent = nullptr);
     void setDrawingMode(DrawingMode mode);
+    void setDrawingColor(const QColor &color); // 设置当前绘图颜色
+    QColor currentDrawingColor() const; // 获取当前绘图颜色
+
 
     void applyColorToSelectedItems(const QColor &color);
 public slots:
@@ -46,9 +50,12 @@ protected:
     void keyPressEvent(QKeyEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
     void keyReleaseEvent(QKeyEvent *event) override;
+    void handlePolylineModePress(QMouseEvent *event); // 新增折线模式处理
+    void handlePolylineModeMove(QMouseEvent *event);  // 新增折线模式移动处理
+    void finishPolyline(); // 结束折线绘制
+    bool checkHandleHit(const QPointF &scenePos); // 更新以支持折线端点
 
     void handleNoneModePress(QMouseEvent *event);
-    bool checkHandleHit(const QPointF &scenePos);
     bool checkSelectedGroupHit(const QPointF &scenePos, qreal tolerance);
     void handleItemSelection(const QPointF &scenePos, qreal tolerance, bool isMultiSelect);
     void handleLineModePress(QMouseEvent *event);
@@ -58,9 +65,6 @@ protected:
     void handleLineModeRelease(QMouseEvent *event);
     void handleHandleRelease();
     void handleGroupRelease();
-    void setDrawingColor(const QColor &color); // 设置当前绘图颜色
-    QColor currentDrawingColor() const; // 获取当前绘图颜色
-
 
     void updateCursorBasedOnPosition(const QPointF &scenePos);
 private:
@@ -88,6 +92,11 @@ private:
     void cleanupDrawing();
     void cleanupSelection();
     bool isShiftPressed;
+
+    // 折线绘制相关变量
+    bool isDrawingPolyline = false; // 是否正在绘制折线
+    QVector<QPointF> polylinePoints; // 存储折线顶点
+    EditablePolylineItem *currentPolyline = nullptr; // 当前正在绘制的折线对象
 };
 
 #endif // GRAPHICSTOOLVIEW_H
