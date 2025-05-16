@@ -20,7 +20,8 @@ GraphicsToolView::GraphicsToolView(QGraphicsScene *scene, QWidget *parent)
     drawingColor(Qt::black) ,// 默认绘图颜色为黑色,
     isDrawingPolyline(false),
     draggedHandleIndex(-1),
-    closePolylineOnFinish(false)
+    closePolylineOnFinish(false),
+    waitingForDoubleClick(false)
 
 {
     setRenderHint(QPainter::Antialiasing);
@@ -85,24 +86,32 @@ void GraphicsToolView::setDrawingMode(DrawingMode mode)
         break;
     }
 }
-
 void GraphicsToolView::mousePressEvent(QMouseEvent *event)
 {
-    qDebug() << "mousePressEvent of GraphicsToolView";
+    qDebug() << "mousePressEvent of GraphicsToolView, Button:" << event->button();
 
     // 记录是否按住 Ctrl 键
     bool isCtrlPressed = event->modifiers() & Qt::ControlModifier;
 
+    // 检查双击事件
+    if (handleDoubleClick(event)) {
+        qDebug() << "Double click handled, returning.";
+        return; // 如果双击事件已处理（结束折线绘制），则不再继续处理其他逻辑
+    }
 
     if (currentMode == DrawingMode::None) {
+        qDebug() << "Handling None mode press.";
         handleNoneModePress(event);
     } else if (currentMode == DrawingMode::Line) {
+        qDebug() << "Handling Line mode press.";
         handleLineModePress(event);
     } else if (currentMode == DrawingMode::Polyline) {
         // 右键结束折线绘制
         if (event->button() == Qt::RightButton) {
+            qDebug() << "Right button clicked, finishing polyline.";
             finishPolyline();
         } else {
+            qDebug() << "Handling Polyline mode press.";
             handlePolylineModePress(event);
         }
     }
@@ -133,19 +142,11 @@ void GraphicsToolView::mouseMoveEvent(QMouseEvent *event)
 
 void GraphicsToolView::wheelEvent(QWheelEvent *event)
 {
-    // Handle mouse wheel events for zooming.
-    // 获取滚轮的垂直滚动量。正值表示向上滚动（通常是放大），负值表示向下滚动（通常是缩小）。
     const qreal delta = event->angleDelta().y();
-
-    // 定义缩放因子。可以根据需要调整这个值来控制缩放速度。
-    qreal scaleFactor = 1.15; // 每次滚轮事件缩放 15%
-
-    // 如果滚轮向上滚动，则放大；如果向下滚动，则缩小。
+    qreal scaleFactor = 1.15;
     if (delta > 0) {
-        // Zoom in
         scale(scaleFactor, scaleFactor);
     } else {
-        // Zoom out
         scale(1.0 / scaleFactor, 1.0 / scaleFactor);
     }
 }
@@ -194,8 +195,45 @@ void GraphicsToolView::keyReleaseEvent(QKeyEvent *event)
     }
     QGraphicsView::keyReleaseEvent(event);
 }
+bool GraphicsToolView::handleDoubleClick(QMouseEvent *event)
+{
+    QPoint currentPos = event->pos();
+    QTime currentTime = QTime::currentTime();
+    const int doubleClickTime = 500; // 增加到500毫秒，更容易触发
+    const int doubleClickDistance = 10; // 增加到10像素，容忍更大的位置误差
+
+    // 调试日志
+    if (waitingForDoubleClick) {
+        int timeDiff = lastClickTime.msecsTo(currentTime);
+        int distDiff = (lastClickPos - currentPos).manhattanLength();
+        qDebug() << "Double click check: Time diff=" << timeDiff << "ms, Distance diff=" << distDiff << "px";
+    }
+
+    // 检查是否为双击
+    if (waitingForDoubleClick &&
+        lastClickTime.msecsTo(currentTime) <= doubleClickTime &&
+        (lastClickPos - currentPos).manhattanLength() <= doubleClickDistance) {
+        // 检测到双击
+        if (currentMode == DrawingMode::Polyline && isDrawingPolyline) {
+            qDebug() << "Double click detected. Finishing polyline.";
+            finishPolyline(); // 双击结束折线绘制
+            waitingForDoubleClick = false; // 重置双击等待状态
+            return true; // 表示已处理双击事件
+        }
+        waitingForDoubleClick = false; // 重置双击等待状态
+        return false; // 表示检测到双击但未执行结束折线操作
+    } else {
+        // 记录当前点击信息，准备检测下一次点击是否为双击
+        lastClickPos = currentPos;
+        lastClickTime = currentTime;
+        waitingForDoubleClick = true;
+        return false; // 表示不是双击
+    }
+}
+
 void GraphicsToolView::finishPolyline()
 {
+    qDebug() << "Entering finishPolyline, isDrawingPolyline:" << isDrawingPolyline;
     if (isDrawingPolyline) {
         if (polylinePoints.size() < 2) {
             qDebug() << "Polyline has less than 2 points, discarding.";
@@ -206,12 +244,16 @@ void GraphicsToolView::finishPolyline()
             }
         } else {
             qDebug() << "Polyline drawing finished with" << polylinePoints.size() << "points.";
-            // 保留 currentPolyline 作为最终对象
+            if (currentPolyline) {
+                // 设置闭合状态
+                currentPolyline->setClosed(closePolylineOnFinish && polylinePoints.size() >= 3);
+            }
         }
         // 清理状态
         polylinePoints.clear();
         isDrawingPolyline = false;
         isDragging = false;
+        closePolylineOnFinish = false; // 重置闭合标志
         if (previewLine) {
             scene()->removeItem(previewLine);
             delete previewLine;
@@ -219,6 +261,8 @@ void GraphicsToolView::finishPolyline()
         }
         qDebug() << "Polyline drawing completed.";
         setDrawingMode(DrawingMode::None); // 可选：绘制完成后返回无模式
+    } else {
+        qDebug() << "Not in polyline drawing mode, nothing to finish.";
     }
 }
 
@@ -296,7 +340,6 @@ void GraphicsToolView::handlePolylineModeMove(QMouseEvent *event)
         previewLine->setPen(pen);
         scene()->addItem(previewLine);
     }
-    qDebug() << "Updating polyline preview to:" << scenePos;
 }
 
 void GraphicsToolView::handleNoneModePress(QMouseEvent *event)
