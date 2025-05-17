@@ -66,9 +66,9 @@ public:
     void handleLineModeRelease(QMouseEvent *event);
     void handleHandleRelease();
     void handleGroupRelease();
-    bool handleDoubleClick(QMouseEvent *event);
 
     void updateCursorBasedOnPosition(const QPointF &scenePos);
+    void mouseDoubleClickEvent(QMouseEvent *event);
 private:
     QColor drawingColor; // 当前绘图颜色
     ColorSelectorPopup *colorSelector; // 颜色选择器弹窗
@@ -101,9 +101,7 @@ private:
     EditablePolylineItem *currentPolyline = nullptr; // 当前正在绘制的折线对象
     int draggedHandleIndex;
     bool closePolylineOnFinish = false; // 新增：是否在结束时闭合折线
-    QPoint lastClickPos; // 上次点击的位置
-    QTime lastClickTime; // 上次点击的时间
-    bool waitingForDoubleClick; // 是否在等待双击
+
 };
 
 #endif // GRAPHICSTOOLVIEW_H

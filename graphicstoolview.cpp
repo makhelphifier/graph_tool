@@ -20,8 +20,7 @@ GraphicsToolView::GraphicsToolView(QGraphicsScene *scene, QWidget *parent)
     drawingColor(Qt::black) ,// 默认绘图颜色为黑色,
     isDrawingPolyline(false),
     draggedHandleIndex(-1),
-    closePolylineOnFinish(false),
-    waitingForDoubleClick(false)
+    closePolylineOnFinish(false)
 
 {
     setRenderHint(QPainter::Antialiasing);
@@ -60,44 +59,44 @@ void GraphicsToolView::onColorSelected(const QColor &color)
 }
 
 
-void GraphicsToolView::setDrawingMode(DrawingMode mode)
-{
-    currentMode = mode;
-    if(mode == DrawingMode::None){
-        setCursor(Qt::ArrowCursor);
-        setMouseTracking(false);
-    }else{
-        setCursor(Qt::CrossCursor);
-        setMouseTracking(true);
+void GraphicsToolView::setDrawingMode(DrawingMode mode) {
+    qDebug() << "Setting drawing mode to:" << static_cast<int>(mode);
+    if (currentMode == DrawingMode::Polyline && isDrawingPolyline) {
+        qDebug() << "Switching mode while drawing polyline, finishing current polyline.";
+        finishPolyline(); // Finish current polyline if mode changes during drawing
     }
-    // 切换模式时清理绘图和选中状态
-    cleanupDrawing();
-    cleanupSelection();
 
+    currentMode = mode;
+    cleanupDrawing();   // Clean up any previous drawing artifacts
+    cleanupSelection(); // Clear selections
 
     switch (mode) {
+    case DrawingMode::None:
+        setCursor(Qt::ArrowCursor);
+        setMouseTracking(false);
+        break;
     case DrawingMode::Line:
-        qDebug()<<"Enter Line Mode";
+        setCursor(Qt::CrossCursor);
+        setMouseTracking(true); // Enable mouse tracking for line preview
+        qDebug() << "Enter Line Mode";
         break;
     case DrawingMode::Polyline:
+        setCursor(Qt::CrossCursor);
+        setMouseTracking(true); // Enable mouse tracking for polyline preview
         qDebug() << "Enter Polyline Mode";
         break;
     default:
+        setCursor(Qt::ArrowCursor);
+        setMouseTracking(false);
         break;
     }
 }
 void GraphicsToolView::mousePressEvent(QMouseEvent *event)
 {
     qDebug() << "mousePressEvent of GraphicsToolView, Button:" << event->button();
+    bool isCtrlPressed = event->modifiers() & Qt::ControlModifier; // 记录Ctrl键状态
 
-    // 记录是否按住 Ctrl 键
-    bool isCtrlPressed = event->modifiers() & Qt::ControlModifier;
-
-    // 检查双击事件
-    if (handleDoubleClick(event)) {
-        qDebug() << "Double click handled, returning.";
-        return; // 如果双击事件已处理（结束折线绘制），则不再继续处理其他逻辑
-    }
+    // 不再调用 handleDoubleClick
 
     if (currentMode == DrawingMode::None) {
         qDebug() << "Handling None mode press.";
@@ -106,20 +105,33 @@ void GraphicsToolView::mousePressEvent(QMouseEvent *event)
         qDebug() << "Handling Line mode press.";
         handleLineModePress(event);
     } else if (currentMode == DrawingMode::Polyline) {
-        // 右键结束折线绘制
-        if (event->button() == Qt::RightButton) {
-            qDebug() << "Right button clicked, finishing polyline.";
-            finishPolyline();
-        } else {
-            qDebug() << "Handling Polyline mode press.";
+        if (event->button() == Qt::LeftButton) { // 左键添加点
+            qDebug() << "Handling Polyline mode press (Left Click).";
             handlePolylineModePress(event);
         }
     }
-
-    QGraphicsView::mousePressEvent(event);
+    QGraphicsView::mousePressEvent(event); // 调用基类
 }
 
 
+
+void GraphicsToolView::mouseDoubleClickEvent(QMouseEvent *event) {
+    qDebug() << "mouseDoubleClickEvent: Button:" << event->button()
+    << "Mode:" << static_cast<int>(currentMode)
+    << "IsDrawingPolyline:" << isDrawingPolyline;
+
+    if (event->button() == Qt::LeftButton && currentMode == DrawingMode::Polyline && isDrawingPolyline) {
+        qDebug() << "Polyline DoubleClick: Finishing polyline.";
+                if (polylinePoints.size() > 0 && currentPolyline) { // Ensure there's something to finish
+
+        }
+        finishPolyline();
+        event->accept();
+    } else {
+        qDebug() << "DoubleClick not for polyline finish or not left button. Passing to base.";
+        QGraphicsView::mouseDoubleClickEvent(event);
+    }
+}
 void GraphicsToolView::mouseMoveEvent(QMouseEvent *event)
 {
 
@@ -132,6 +144,7 @@ void GraphicsToolView::mouseMoveEvent(QMouseEvent *event)
         handleLineModeMove(event);
     } else if (currentMode == DrawingMode::Polyline && isDrawingPolyline && isDragging) {
         handlePolylineModeMove(event);
+        qDebug()<<"处理折线鼠标移动函数";
     } else if (currentMode == DrawingMode::None && draggedHandle && draggedItem) {
         handleHandleMove(event);
     } else if (currentMode == DrawingMode::None && isDraggingSelectionGroup && !selectedItems.isEmpty()) {
@@ -154,13 +167,15 @@ void GraphicsToolView::wheelEvent(QWheelEvent *event)
 
 void GraphicsToolView::keyPressEvent(QKeyEvent *event)
 {
+    qDebug() << "keyPressEvent: Key:" << event->key();
+
     // Handle Escape key for cancelling drawing or clearing selection
     if (event->key() == Qt::Key_Escape) {
-        if (currentMode != DrawingMode::None) {
+        if (currentMode != DrawingMode::None || isDrawingPolyline) { // Also cancel if drawing polyline
             qDebug() << "Esc pressed. Cancelling drawing.";
-            cleanupDrawing();
-            setDrawingMode(DrawingMode::None);
-        } else {
+            cleanupDrawing(); // This will call finishPolyline if isDrawingPolyline is true and then reset.
+            setDrawingMode(DrawingMode::None); // Explicitly set to None mode
+        } else if (!selectedItems.isEmpty()){
             qDebug() << "Esc pressed. Clearing selection.";
             cleanupSelection();
         }
@@ -173,18 +188,32 @@ void GraphicsToolView::keyPressEvent(QKeyEvent *event)
             isShiftPressed = true;
             qDebug() << "Shift pressed. Restricting line to horizontal or vertical.";
         }
-    }else if (event->key() == Qt::Key_C) {
-        // C 键切换闭合折线状态
-        if (currentMode == DrawingMode::Polyline && isDrawingPolyline) {
+    } else if (event->key() == Qt::Key_C) {
+        if (currentMode == DrawingMode::Polyline && isDrawingPolyline) { // 'C' for close polyline
             closePolylineOnFinish = !closePolylineOnFinish;
             qDebug() << "C pressed. Polyline will" << (closePolylineOnFinish ? "close" : "not close") << "on finish.";
+            // Optionally update preview line to show closing segment if closePolylineOnFinish is true
+            if (previewLine && closePolylineOnFinish && polylinePoints.size() >=2) {
+                QPointF currentMousePos = previewLine->line().p2(); // Get current mouse pos from preview
+                scene()->removeItem(previewLine); delete previewLine; // Remove old preview
+                previewLine = new EditableLineItem(polylinePoints.first(), currentMousePos); // Preview from start to mouse
+                // Apply color etc.
+                scene()->addItem(previewLine);
+            } else if (previewLine && !closePolylineOnFinish && polylinePoints.size() >=1) {
+                QPointF currentMousePos = previewLine->line().p2();
+                scene()->removeItem(previewLine); delete previewLine;
+                previewLine = new EditableLineItem(polylinePoints.last(), currentMousePos); // Preview from last to mouse
+                // Apply color etc.
+                scene()->addItem(previewLine);
+            }
             event->accept();
             return;
         }
     }
 
-
-    QGraphicsView::keyPressEvent(event);
+    if (!event->isAccepted()) {
+        QGraphicsView::keyPressEvent(event);
+    }
 }
 
 void GraphicsToolView::keyReleaseEvent(QKeyEvent *event)
@@ -195,84 +224,51 @@ void GraphicsToolView::keyReleaseEvent(QKeyEvent *event)
     }
     QGraphicsView::keyReleaseEvent(event);
 }
-bool GraphicsToolView::handleDoubleClick(QMouseEvent *event)
-{
-    QPoint currentPos = event->pos();
-    QTime currentTime = QTime::currentTime();
-    const int doubleClickTime = 500; // 增加到500毫秒，更容易触发
-    const int doubleClickDistance = 10; // 增加到10像素，容忍更大的位置误差
-
-    // 调试日志
-    if (waitingForDoubleClick) {
-        int timeDiff = lastClickTime.msecsTo(currentTime);
-        int distDiff = (lastClickPos - currentPos).manhattanLength();
-        qDebug() << "Double click check: Time diff=" << timeDiff << "ms, Distance diff=" << distDiff << "px";
-    }
-
-    // 检查是否为双击
-    if (waitingForDoubleClick &&
-        lastClickTime.msecsTo(currentTime) <= doubleClickTime &&
-        (lastClickPos - currentPos).manhattanLength() <= doubleClickDistance) {
-        // 检测到双击
-        if (currentMode == DrawingMode::Polyline && isDrawingPolyline) {
-            qDebug() << "Double click detected. Finishing polyline.";
-            finishPolyline(); // 双击结束折线绘制
-            waitingForDoubleClick = false; // 重置双击等待状态
-            return true; // 表示已处理双击事件
-        }
-        waitingForDoubleClick = false; // 重置双击等待状态
-        return false; // 表示检测到双击但未执行结束折线操作
-    } else {
-        // 记录当前点击信息，准备检测下一次点击是否为双击
-        lastClickPos = currentPos;
-        lastClickTime = currentTime;
-        waitingForDoubleClick = true;
-        return false; // 表示不是双击
-    }
-}
-
-void GraphicsToolView::finishPolyline()
-{
-    qDebug() << "Entering finishPolyline, isDrawingPolyline:" << isDrawingPolyline;
+void GraphicsToolView::finishPolyline() {
+    qDebug() << "finishPolyline called. isDrawingPolyline:" << isDrawingPolyline
+             << "Point count:" << polylinePoints.size();
     if (isDrawingPolyline) {
-        if (polylinePoints.size() < 2) {
-            qDebug() << "Polyline has less than 2 points, discarding.";
-            if (currentPolyline) {
-                scene()->removeItem(currentPolyline);
-                delete currentPolyline;
-                currentPolyline = nullptr;
+        // If currentPolyline exists and has enough points, finalize it
+        if (currentPolyline && polylinePoints.size() >= 2) {
+            qDebug() << "Polyline drawing finalized with" << polylinePoints.size() << "points.";
+            if (closePolylineOnFinish && polylinePoints.size() >= 3) {
+                currentPolyline->setClosed(true);
+                qDebug() << "Polyline set to closed.";
+            } else {
+                currentPolyline->setClosed(false);
+                qDebug() << "Polyline set to open.";
             }
+            // currentPolyline is already in scene, no need to re-add.
+            // It was updated with each point in handlePolylineModePress.
+        } else if (currentPolyline) { // Not enough points, remove the item
+            qDebug() << "Polyline has less than 2 points, discarding visual item.";
+            scene()->removeItem(currentPolyline);
+            delete currentPolyline;
+            currentPolyline = nullptr;
         } else {
-            qDebug() << "Polyline drawing finished with" << polylinePoints.size() << "points.";
-            if (currentPolyline) {
-                // 设置闭合状态
-                currentPolyline->setClosed(closePolylineOnFinish && polylinePoints.size() >= 3);
-            }
+            qDebug() << "No polyline item to finalize or not enough points.";
         }
-        // 清理状态
+
+        // Common cleanup for the drawing session
         polylinePoints.clear();
         isDrawingPolyline = false;
-        isDragging = false;
-        closePolylineOnFinish = false; // 重置闭合标志
+        isDragging = false; // Important to reset this
+        closePolylineOnFinish = false;
         if (previewLine) {
             scene()->removeItem(previewLine);
             delete previewLine;
             previewLine = nullptr;
         }
-        qDebug() << "Polyline drawing completed.";
-        setDrawingMode(DrawingMode::None); // 可选：绘制完成后返回无模式
+        qDebug() << "Polyline drawing session ended. Resetting to None mode.";
+        setDrawingMode(DrawingMode::None);
     } else {
-        qDebug() << "Not in polyline drawing mode, nothing to finish.";
+        qDebug() << "finishPolyline called but not in polyline drawing mode.";
     }
 }
 
-
-
-void GraphicsToolView::handlePolylineModePress(QMouseEvent *event)
-{
+void GraphicsToolView::handlePolylineModePress(QMouseEvent *event) {
     QPointF scenePos = mapToScene(event->pos());
 
-    // 如果按住 Shift 键，限制方向
     if (isShiftPressed && !polylinePoints.isEmpty()) {
         QPointF lastPoint = polylinePoints.last();
         qreal dx = qAbs(scenePos.x() - lastPoint.x());
@@ -285,42 +281,68 @@ void GraphicsToolView::handlePolylineModePress(QMouseEvent *event)
     }
 
     if (!isDrawingPolyline) {
-        // 开始新的折线绘制
-        polylinePoints.clear();
-        qDebug() << "Starting new polyline at:" << scenePos;
-        polylinePoints.append(scenePos);
-        isDrawingPolyline = true;
-        isDragging = true;
-    }else {
-        // 添加新的顶点
-        qDebug() << "Adding polyline point at:" << scenePos;
-        polylinePoints.append(scenePos);
-        // 更新或创建折线对象
-        if (currentPolyline) {
+        polylinePoints.clear(); // Clear points for a new polyline
+        if(currentPolyline) { // Clean up any existing but unfinished polyline item
             scene()->removeItem(currentPolyline);
             delete currentPolyline;
+            currentPolyline = nullptr;
         }
-        currentPolyline = new EditablePolylineItem(polylinePoints);
-        QPen pen = currentPolyline->pen();
+        if(previewLine) { // Clean up preview line
+            scene()->removeItem(previewLine);
+            delete previewLine;
+            previewLine = nullptr;
+        }
+        polylinePoints.append(scenePos);
+        isDrawingPolyline = true;
+        isDragging = true; // Set for mouseMove to draw preview
+        qDebug() << "Starting new polyline at:" << scenePos;
+    } else {
+        // Add subsequent points
+        if (polylinePoints.isEmpty() || polylinePoints.last() != scenePos) { // Avoid duplicate points
+            polylinePoints.append(scenePos);
+            qDebug() << "Adding polyline point at:" << scenePos;
+        }
+
+        if (polylinePoints.size() >= 2) {
+            if (currentPolyline) {
+                scene()->removeItem(currentPolyline); // Remove old polyline item
+                delete currentPolyline;
+            }
+            currentPolyline = new EditablePolylineItem(polylinePoints); // Create new with all points
+            QPen pen = currentPolyline->pen();
+            pen.setColor(drawingColor);
+            currentPolyline->setPen(pen);
+            scene()->addItem(currentPolyline);
+            qDebug() << "Updated polyline with" << polylinePoints.size() << "points.";
+        }
+    }
+    // Update preview line for the next segment
+    if (isDrawingPolyline && !polylinePoints.isEmpty()) {
+        if (previewLine) {
+            scene()->removeItem(previewLine);
+            delete previewLine;
+        }
+        // Preview from last point to current mouse pos (which is scenePos here, but will update on move)
+        previewLine = new EditableLineItem(polylinePoints.last(), scenePos);
+        QPen pen = previewLine->pen();
         pen.setColor(drawingColor);
-        currentPolyline->setPen(pen);
-        scene()->addItem(currentPolyline);
-        qDebug() << "Updated polyline with" << polylinePoints.size() << "points.";
+        pen.setStyle(Qt::DashLine); // Make preview line dashed
+        previewLine->setPen(pen);
+        scene()->addItem(previewLine);
     }
 }
 
 
-void GraphicsToolView::handlePolylineModeMove(QMouseEvent *event)
-{
-    if (!isDrawingPolyline || polylinePoints.isEmpty()) {
+
+void GraphicsToolView::handlePolylineModeMove(QMouseEvent *event) {
+    if (!isDrawingPolyline || polylinePoints.isEmpty() || !isDragging) {
         return;
     }
 
     QPointF scenePos = mapToScene(event->pos());
+    QPointF lastPoint = polylinePoints.last();
 
-    // 如果按住 Shift 键，限制方向
     if (isShiftPressed) {
-        QPointF lastPoint = polylinePoints.last();
         qreal dx = qAbs(scenePos.x() - lastPoint.x());
         qreal dy = qAbs(scenePos.y() - lastPoint.y());
         if (dx > dy) {
@@ -330,17 +352,18 @@ void GraphicsToolView::handlePolylineModeMove(QMouseEvent *event)
         }
     }
 
-    // 更新预览线段（从最后一个顶点到鼠标当前位置）
     if (previewLine) {
-        previewLine->setLine(polylinePoints.last().x(), polylinePoints.last().y(), scenePos.x(), scenePos.y());
-    } else {
-        previewLine = new EditableLineItem(polylinePoints.last(), scenePos);
+        previewLine->setLine(lastPoint.x(), lastPoint.y(), scenePos.x(), scenePos.y());
+    } else { // Should have been created in press, but as a fallback
+        previewLine = new EditableLineItem(lastPoint, scenePos);
         QPen pen = previewLine->pen();
         pen.setColor(drawingColor);
+        pen.setStyle(Qt::DashLine);
         previewLine->setPen(pen);
         scene()->addItem(previewLine);
     }
 }
+
 
 void GraphicsToolView::handleNoneModePress(QMouseEvent *event)
 {
@@ -468,43 +491,49 @@ void GraphicsToolView::handleItemSelection(const QPointF &scenePos, qreal tolera
     }
 }
 
-void GraphicsToolView::handleLineModePress(QMouseEvent *event)
-{
+void GraphicsToolView::handleLineModePress(QMouseEvent *event) {
+    if (event->button() != Qt::LeftButton) return;
+
+    QPointF scenePos = mapToScene(event->pos());
+    if (isShiftPressed && !startPoint.isNull()) { // If Shift is pressed and we have a start point
+        qreal dx = qAbs(scenePos.x() - startPoint.x());
+        qreal dy = qAbs(scenePos.y() - startPoint.y());
+        if (dx > dy) scenePos.setY(startPoint.y());
+        else scenePos.setX(startPoint.x());
+    }
+
     if (startPoint.isNull()) {
-        startPoint = mapToScene(event->pos());
-        qDebug() << "Start Point set to:" << startPoint;
-        if (previewLine) {
+        startPoint = scenePos;
+        isDragging = true; // For preview
+        qDebug() << "Line mode: Start Point set to:" << startPoint;
+        if (previewLine) { // Clean up old preview if any
             scene()->removeItem(previewLine);
             delete previewLine;
             previewLine = nullptr;
         }
-        isDragging = true;
+        // Create new preview line
+        previewLine = new EditableLineItem(startPoint, startPoint); // Start and end at same point initially
+        QPen pen = previewLine->pen();
+        pen.setColor(drawingColor);
+        pen.setStyle(Qt::DashLine);
+        previewLine->setPen(pen);
+        scene()->addItem(previewLine);
+
     } else {
-        endPoint = mapToScene(event->pos());
-        // 如果按住 Shift 键，限制方向
-        if (isShiftPressed) {
-            qreal dx = qAbs(endPoint.x() - startPoint.x());
-            qreal dy = qAbs(endPoint.y() - startPoint.y());
-            if (dx > dy) {
-                endPoint.setY(startPoint.y());
-            } else {
-                endPoint.setX(startPoint.x());
-            }
-        }
-        qDebug() << "End Point set to:" << endPoint;
-        qDebug() << "Both points are set - Start Point:" << startPoint << ", End Point:" << endPoint;
-        QGraphicsLineItem *line = new EditableLineItem(startPoint, endPoint);
-        // 应用当前绘图颜色
+        endPoint = scenePos;
+        qDebug() << "Line mode: End Point set to:" << endPoint;
+
+        EditableLineItem *line = new EditableLineItem(startPoint, endPoint);
         QPen pen = line->pen();
         pen.setColor(drawingColor);
         line->setPen(pen);
         scene()->addItem(line);
         qDebug() << "Line created from" << startPoint << "to" << endPoint;
-        qDebug() << "Drawing completed. Resetting points.";
-        cleanupDrawing();
+
+        cleanupDrawing(); // Resets startPoint, previewLine, isDragging
+        setDrawingMode(DrawingMode::None); // Optionally switch back to None mode
     }
 }
-
 
 void GraphicsToolView::updateCursorBasedOnPosition(const QPointF &scenePos)
 {
@@ -533,36 +562,18 @@ void GraphicsToolView::updateCursorBasedOnPosition(const QPointF &scenePos)
 }
 
 
-void GraphicsToolView::handleLineModeMove(QMouseEvent *event)
-{
-    endPoint = mapToScene(event->pos());
-    // 如果按住 Shift 键，限制直线方向为水平或垂直
+void GraphicsToolView::handleLineModeMove(QMouseEvent *event) {
+    if (startPoint.isNull() || !isDragging || !previewLine) return;
+
+    QPointF scenePos = mapToScene(event->pos());
     if (isShiftPressed) {
-        QPointF currentPoint = mapToScene(event->pos());
-        qreal dx = qAbs(currentPoint.x() - startPoint.x());
-        qreal dy = qAbs(currentPoint.y() - startPoint.y());
-        if (dx > dy) {
-            // 水平方向移动更大，限制为水平线
-            endPoint.setY(startPoint.y());
-            qDebug() << "Restricting to horizontal line. End point:" << endPoint;
-        } else {
-            // 垂直方向移动更大，限制为垂直线
-            endPoint.setX(startPoint.x());
-            qDebug() << "Restricting to vertical line. End point:" << endPoint;
-        }
+        qreal dx = qAbs(scenePos.x() - startPoint.x());
+        qreal dy = qAbs(scenePos.y() - startPoint.y());
+        if (dx > dy) scenePos.setY(startPoint.y());
+        else scenePos.setX(startPoint.x());
     }
-    qDebug() << "Both points are set - Start Point:" << startPoint << ", End Point:" << endPoint;
-    if (previewLine) {
-        previewLine->setLine(startPoint.x(), startPoint.y(), endPoint.x(), endPoint.y());
-    } else {
-        previewLine = new EditableLineItem(startPoint, endPoint);
-        // 应用当前绘图颜色到预览线段
-        QPen pen = previewLine->pen();
-        pen.setColor(drawingColor);
-        previewLine->setPen(pen);
-        scene()->addItem(previewLine);
-    }
-    qDebug() << "End Point set to:" << endPoint;
+    previewLine->setLine(QLineF(startPoint, scenePos));
+    qDebug() << "Line mode: Preview to:" << scenePos;
 }
 void GraphicsToolView::applyColorToSelectedItems(const QColor &color)
 {
@@ -651,14 +662,16 @@ void GraphicsToolView::mouseReleaseEvent(QMouseEvent *event)
 {
     qDebug() << "mouseReleaseEvent of GraphicsToolView";
     if (currentMode == DrawingMode::Line && !startPoint.isNull() && isDragging) {
-        handleLineModeRelease(event);
+
     } else if (currentMode == DrawingMode::None && draggedHandle) {
         handleHandleRelease();
     } else if (currentMode == DrawingMode::None && isDraggingSelectionGroup) {
         handleGroupRelease();
     }
 
-    QGraphicsView::mouseReleaseEvent(event);
+    if (!event->isAccepted()) {
+        QGraphicsView::mouseReleaseEvent(event);
+    }
 }
 
 void GraphicsToolView::handleLineModeRelease(QMouseEvent *event)
@@ -722,27 +735,28 @@ void GraphicsToolView::handleGroupRelease()
 
 
 
-void GraphicsToolView::cleanupDrawing()
-{
-    qDebug() << "Cleaning up drawing state.";
-    // 清理预览线条
+void GraphicsToolView::cleanupDrawing() {
+    qDebug() << "Cleaning up drawing state. Current mode:" << static_cast<int>(currentMode);
     if (previewLine) {
         scene()->removeItem(previewLine);
         delete previewLine;
         previewLine = nullptr;
     }
-    // 重置起点和终点
     startPoint = QPointF();
     endPoint = QPointF();
-    // 重置折线状态
-    polylinePoints.clear();
-    if (currentPolyline) {
-        scene()->removeItem(currentPolyline);
-        delete currentPolyline;
-        currentPolyline = nullptr;
+
+    // Polyline specific cleanup
+    if (isDrawingPolyline || !polylinePoints.isEmpty() || currentPolyline) {
+        qDebug() << "Cleaning up polyline specific drawing artifacts.";
+        polylinePoints.clear();
+        if (currentPolyline) {
+            scene()->removeItem(currentPolyline);
+            delete currentPolyline;
+            currentPolyline = nullptr;
+        }
+        isDrawingPolyline = false;
+        closePolylineOnFinish = false;
     }
-    isDrawingPolyline = false;
-    // 重置拖动状态
     isDragging = false;
 }
 
