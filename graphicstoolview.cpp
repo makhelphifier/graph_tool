@@ -213,6 +213,7 @@ void GraphicsToolView::finishPolyline()
                 currentPolyline->setClosed(false);
                 qDebug() << "折线设置为开放";
             }
+            currentPolyline = nullptr;
         } else if (currentPolyline) {
             qDebug() << "折线点数不足，丢弃图形";
             scene()->removeItem(currentPolyline);
