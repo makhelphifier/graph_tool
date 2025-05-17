@@ -11,6 +11,7 @@
 #include "colorselectorpopup.h"
 #include "editablepolylineitem.h"
 
+#include <QTime>
 
 class HandleItem; // 前向声明
 class EditableLineItem;
@@ -43,7 +44,7 @@ public slots:
     void showColorSelector(); // 显示颜色选择器
     void onColorSelected(const QColor &color); // 处理颜色选择信号
 
-protected:
+public:
     void wheelEvent(QWheelEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
@@ -65,6 +66,7 @@ protected:
     void handleLineModeRelease(QMouseEvent *event);
     void handleHandleRelease();
     void handleGroupRelease();
+    bool handleDoubleClick(QMouseEvent *event);
 
     void updateCursorBasedOnPosition(const QPointF &scenePos);
 private:
@@ -88,7 +90,6 @@ private:
     bool isDragging; // 标志用户是否正在拖动
     QPointF dragStartPosition; // 拖动开始时的鼠标位置
     QPointF fixedRotationCenter; // 用于保存旋转开始时的旋转中心位置
-    bool closePolylineOnFinish = false; // 是否在结束时闭合折线
 
     void cleanupDrawing();
     void cleanupSelection();
@@ -99,6 +100,10 @@ private:
     QVector<QPointF> polylinePoints; // 存储折线顶点
     EditablePolylineItem *currentPolyline = nullptr; // 当前正在绘制的折线对象
     int draggedHandleIndex;
+    bool closePolylineOnFinish = false; // 新增：是否在结束时闭合折线
+    QPoint lastClickPos; // 上次点击的位置
+    QTime lastClickTime; // 上次点击的时间
+    bool waitingForDoubleClick; // 是否在等待双击
 };
 
 #endif // GRAPHICSTOOLVIEW_H

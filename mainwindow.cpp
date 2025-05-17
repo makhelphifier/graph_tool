@@ -53,6 +53,16 @@ MainWindow::MainWindow(QWidget *parent)
     connect(drawPolylineButton, &QPushButton::clicked, this, [=]() {
         graphicsView->setDrawingMode(GraphicsToolView::DrawingMode::Polyline);
     });
+
+    // 闭合折线按钮（可选）
+    QAction *closePolylineAction = new QAction(tr("闭合折线 (C)"), this);
+    connect(closePolylineAction, &QAction::triggered, [=]() {
+        // 模拟按下 C 键切换闭合状态
+        QKeyEvent keyEvent(QEvent::KeyPress, Qt::Key_C, Qt::NoModifier);
+        graphicsView->keyPressEvent(&keyEvent);
+    });
+    toolBar->addAction(closePolylineAction);
+
     QPushButton *selectButton = new QPushButton("取消绘制");
     toolBar->addWidget(selectButton);
     connect(selectButton, &QPushButton::clicked, this, [=]() {
