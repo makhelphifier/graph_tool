@@ -493,6 +493,7 @@ void GraphicsToolView::handleItemSelection(const QPointF &scenePos, qreal tolera
 
 void GraphicsToolView::handleLineModePress(QMouseEvent *event)
 {
+    selectedItems.clear();
     if (event->button() != Qt::LeftButton) return;
     QPointF scenePos = mapToScene(event->pos());
     if (isShiftPressed && !startPoint.isNull()) {
@@ -516,6 +517,7 @@ void GraphicsToolView::handleLineModePress(QMouseEvent *event)
         pen.setStyle(Qt::SolidLine);
         previewLine->setPen(pen);
         previewLine->setSelected(false); // 取消选中状态
+        previewLine->setFlag(QGraphicsItem::ItemIsSelectable, false);
         scene()->addItem(previewLine);
     } else {
         endPoint = scenePos;
@@ -528,7 +530,7 @@ void GraphicsToolView::handleLineModePress(QMouseEvent *event)
         scene()->addItem(line);
         qDebug() << "创建直线，从" << startPoint << "到" << endPoint;
         cleanupDrawing();
-        setDrawingMode(DrawingMode::None);
+        setDrawingMode(DrawingMode::None); selectedItems.clear();
     }
 }
 
