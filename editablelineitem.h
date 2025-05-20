@@ -1,4 +1,4 @@
-#ifndef EDITABLELINEITEM_H
+#ifndef EDITABLELINEITEM_H   
 #define EDITABLELINEITEM_H
 
 #include <QGraphicsLineItem>
