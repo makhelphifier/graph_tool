@@ -61,37 +61,47 @@ void EditablePolylineItem::setSelectedState(bool selected)
     }
 }
 
+
 QRectF EditablePolylineItem::boundingRect() const
 {
     if (points.isEmpty()) return QRectF();
 
-    qreal minX = points.first().x();
-    qreal maxX = points.first().x();
-    qreal minY = points.first().y();
-    qreal maxY = points.first().y();
-
-    for (const QPointF& p : points) {
-        minX = qMin(minX, p.x());
-        maxX = qMax(maxX, p.x());
-        minY = qMin(minY, p.y());
-        maxY = qMax(maxY, p.y());
+    QPainterPath path;
+    if (!points.isEmpty()) {
+        path.moveTo(points.first());
+        for (int i = 1; i < points.size(); ++i) {
+            path.lineTo(points[i]);
+        }
+        if (isClosed_ && points.size() >= 3) { // 如果闭合且点数足够形成多边形
+            path.lineTo(points.first()); // 将路径闭合以正确计算边界
+        }
     }
 
-    return QRectF(minX, minY, maxX - minX, maxY - minY).adjusted(-2, -2, 2, 2);
+    // 为画笔宽度和可能的控制柄大小添加一些边距
+    qreal penWidth = linePen.widthF();
+    qreal margin = penWidth / 2.0 + 4.0; // 4.0 是一个大致的控制柄边距
+    return path.boundingRect().adjusted(-margin, -margin, margin, margin);
 }
+
 
 void EditablePolylineItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
 {
     Q_UNUSED(option);
     Q_UNUSED(widget);
 
-    painter->setPen(linePen);
+    painter->setPen(linePen); // 设置画笔
     if (points.size() >= 2) {
         for (int i = 0; i < points.size() - 1; ++i) {
             painter->drawLine(points[i], points[i + 1]);
         }
+        // 如果折线是闭合的，并且有足够的点来形成一个闭合形状，则绘制连接最后一个点和第一个点的线
+        if (isClosed_ && points.size() >= 3) {
+            qDebug() << "Painting closing segment for polyline:" << this << "from" << points.last() << "to" << points.first();
+            painter->drawLine(points.last(), points.first());
+        }
     }
 }
+
 
 QVariant EditablePolylineItem::itemChange(GraphicsItemChange change, const QVariant &value)
 {
@@ -140,8 +150,12 @@ void EditablePolylineItem::updateHandlesPosition()
 
 void EditablePolylineItem::setClosed(bool closed)
 {
-    isClosed_ = closed;
-    update();
-    qDebug() << "Polyline set to" << (closed ? "closed" : "open");
-}
+    if (isClosed_ == closed) return; // 如果状态未改变，则不执行任何操作
 
+    isClosed_ = closed;
+    qDebug() << "Polyline " << this << " set to " << (isClosed_ ? "closed" : "open");
+
+    // 因为 boundingRect 的计算依赖于 isClosed_，所以需要调用 prepareGeometryChange
+    prepareGeometryChange();
+    update(); // 请求重绘
+}
