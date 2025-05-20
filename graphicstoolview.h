@@ -69,6 +69,7 @@ public:
 
     void updateCursorBasedOnPosition(const QPointF &scenePos);
     void mouseDoubleClickEvent(QMouseEvent *event);
+    void updatePolylinePreview(const QPointF &currentMousePos);
 private:
     QColor drawingColor; // 当前绘图颜色
     ColorSelectorPopup *colorSelector; // 颜色选择器弹窗
@@ -101,6 +102,8 @@ private:
     EditablePolylineItem *currentPolyline = nullptr; // 当前正在绘制的折线对象
     int draggedHandleIndex;
     bool closePolylineOnFinish = false; // 新增：是否在结束时闭合折线
+
+    EditableLineItem *previewClosingSegment = nullptr; // 闭合预览线（从鼠标到第一个点） // 新增
 
 };
 

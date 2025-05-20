@@ -19,7 +19,8 @@ GraphicsToolView::GraphicsToolView(QGraphicsScene *scene, QWidget *parent)
     drawingColor(Qt::black),  // 默认绘图颜色为黑色
     isDrawingPolyline(false),
     draggedHandleIndex(-1),
-    closePolylineOnFinish(false)
+    closePolylineOnFinish(false),
+    previewClosingSegment(nullptr)
 {
     setRenderHint(QPainter::Antialiasing);
 }
@@ -165,27 +166,23 @@ void GraphicsToolView::keyPressEvent(QKeyEvent *event)
             isShiftPressed = true;
             qDebug() << "按下Shift，限制直线方向";
         }
-    } else if (event->key() == Qt::Key_C) {
-        if (currentMode == DrawingMode::Polyline && isDrawingPolyline) {
-            closePolylineOnFinish = !closePolylineOnFinish;
-            qDebug() << "按下C，折线结束时" << (closePolylineOnFinish ? "闭合" : "不闭合");
-            if (previewLine && closePolylineOnFinish && polylinePoints.size() >= 2) {
-                QPointF currentMousePos = previewLine->line().p2();
-                scene()->removeItem(previewLine);
-                delete previewLine;
-                previewLine = new EditableLineItem(polylinePoints.first(), currentMousePos);
-                scene()->addItem(previewLine);
-            } else if (previewLine && !closePolylineOnFinish && polylinePoints.size() >= 1) {
-                QPointF currentMousePos = previewLine->line().p2();
-                scene()->removeItem(previewLine);
-                delete previewLine;
-                previewLine = new EditableLineItem(polylinePoints.last(), currentMousePos);
-                scene()->addItem(previewLine);
+    } else  // 处理 'C' 键，用于闭合折线并结束绘制
+        if (event->key() == Qt::Key_C) {
+            if (currentMode == DrawingMode::Polyline && isDrawingPolyline) {
+                qDebug() << "按下C，尝试闭合并完成折线";
+                // 确保至少有2个点才能形成一个可以闭合的线段 (形成图形至少需要3个点)
+                if (polylinePoints.size() >= 2) {
+                    closePolylineOnFinish = true; // 设置闭合标志
+                    finishPolyline();             // 调用 finishPolyline 来完成绘制和闭合
+                } else {
+                    qDebug() << "点数不足 (<2)，无法闭合折线。将作为开放折线结束（如果可能）或丢弃。";
+                    closePolylineOnFinish = false; // 确保不会尝试闭合一个无效的多边形
+                    finishPolyline(); // 正常结束，finishPolyline 会处理点数不足的情况
+                }
+                event->accept();
+                return;
             }
-            event->accept();
-            return;
         }
-    }
     if (!event->isAccepted()) {
         QGraphicsView::keyPressEvent(event);
     }
@@ -196,25 +193,30 @@ void GraphicsToolView::keyReleaseEvent(QKeyEvent *event)
     if (event->key() == Qt::Key_Shift) {
         isShiftPressed = false;
         qDebug() << "释放Shift，不限制直线方向";
+        if (currentMode == DrawingMode::Polyline && previewLine && !polylinePoints.isEmpty()) {
+            // 当Shift状态改变时，更新预览线
+            updatePolylinePreview(previewLine->line().p2());
+        }
     }
     QGraphicsView::keyReleaseEvent(event);
 }
-
 void GraphicsToolView::finishPolyline()
 {
     qDebug() << "结束折线绘制，是否绘制中：" << isDrawingPolyline << "点数：" << polylinePoints.size();
     if (isDrawingPolyline) {
-        if (currentPolyline && polylinePoints.size() >= 2) {
+        if (currentPolyline && polylinePoints.size() >= 2) { // 折线至少需要2个点
             qDebug() << "折线绘制完成，点数：" << polylinePoints.size();
-            if (closePolylineOnFinish && polylinePoints.size() >= 3) {
-                currentPolyline->setClosed(true);
+            if (closePolylineOnFinish && polylinePoints.size() >= 3) { // 闭合的多边形至少需要3个点
+                currentPolyline->setClosed(true); // 设置 EditablePolylineItem 为闭合
                 qDebug() << "折线设置为闭合";
             } else {
-                currentPolyline->setClosed(false);
-                qDebug() << "折线设置为开放";
+                currentPolyline->setClosed(false); // 明确设置为不闭合
+                qDebug() << "折线设置为开放 (或点数不足以闭合)";
             }
-            currentPolyline = nullptr;
-        } else if (currentPolyline) {
+            // currentPolyline 已经在场景中了，不需要再次添加
+            // scene()->addItem(currentPolyline); // 这行是多余的，因为 currentPolyline 在 handlePolylineModePress 中已添加
+            currentPolyline = nullptr; // 完成后，重置 currentPolyline 指针，因为实际对象已由场景管理
+        } else if (currentPolyline) { // 点数不足 (例如只有1个点后就结束了)
             qDebug() << "折线点数不足，丢弃图形";
             scene()->removeItem(currentPolyline);
             delete currentPolyline;
@@ -222,22 +224,30 @@ void GraphicsToolView::finishPolyline()
         } else {
             qDebug() << "无折线图形或点数不足";
         }
+
+        // 清理状态
         polylinePoints.clear();
         isDrawingPolyline = false;
-        isDragging = false;
-        closePolylineOnFinish = false;
+        isDragging = false; // isDragging 应该在 mouseReleaseEvent 或类似地方重置
+
         if (previewLine) {
             scene()->removeItem(previewLine);
             delete previewLine;
             previewLine = nullptr;
         }
+        if (previewClosingSegment) { // 清理闭合预览线
+            scene()->removeItem(previewClosingSegment);
+            delete previewClosingSegment;
+            previewClosingSegment = nullptr;
+        }
+        closePolylineOnFinish = false; // 为下次绘制重置
+
         qDebug() << "折线绘制结束，重置为无模式";
-        setDrawingMode(DrawingMode::None);
+        setDrawingMode(DrawingMode::None); // 可选：绘制完成后返回无模式
     } else {
         qDebug() << "调用结束折线，但不在绘制模式";
     }
 }
-
 void GraphicsToolView::handlePolylineModePress(QMouseEvent *event)
 {
     QPointF scenePos = mapToScene(event->pos());
@@ -305,27 +315,64 @@ void GraphicsToolView::handlePolylineModeMove(QMouseEvent *event)
         return;
     }
     QPointF scenePos = mapToScene(event->pos());
+    updatePolylinePreview(scenePos); // 调用新的辅助函数
+}
+
+
+
+// 新增辅助函数
+void GraphicsToolView::updatePolylinePreview(const QPointF& currentMousePos)
+{
+    if (!isDrawingPolyline || polylinePoints.isEmpty()) {
+        return;
+    }
+
     QPointF lastPoint = polylinePoints.last();
+    QPointF effectiveMousePos = currentMousePos;
+
     if (isShiftPressed) {
-        qreal dx = qAbs(scenePos.x() - lastPoint.x());
-        qreal dy = qAbs(scenePos.y() - lastPoint.y());
+        qreal dx = qAbs(effectiveMousePos.x() - lastPoint.x());
+        qreal dy = qAbs(effectiveMousePos.y() - lastPoint.y());
         if (dx > dy) {
-            scenePos.setY(lastPoint.y());
+            effectiveMousePos.setY(lastPoint.y());
         } else {
-            scenePos.setX(lastPoint.x());
+            effectiveMousePos.setX(lastPoint.x());
         }
     }
+
+    // 更新主预览线 (从最后一个点到当前鼠标)
     if (previewLine) {
-        previewLine->setLine(lastPoint.x(), lastPoint.y(), scenePos.x(), scenePos.y());
+        previewLine->setLine(lastPoint.x(), lastPoint.y(), effectiveMousePos.x(), effectiveMousePos.y());
     } else {
-        previewLine = new EditableLineItem(lastPoint, scenePos);
+        previewLine = new EditableLineItem(lastPoint, effectiveMousePos);
         QPen pen = previewLine->pen();
         pen.setColor(drawingColor);
         pen.setStyle(Qt::DashLine);
         previewLine->setPen(pen);
         scene()->addItem(previewLine);
     }
+    previewLine->setVisible(true);
+
+
+    // 更新闭合预览线段
+    if (closePolylineOnFinish && polylinePoints.size() >= 1) { // 至少需要1个已确定的点来形成闭合预览
+        if (!previewClosingSegment) {
+            previewClosingSegment = new EditableLineItem(effectiveMousePos, polylinePoints.first());
+            QPen pen = previewClosingSegment->pen();
+            pen.setColor(drawingColor); // 可以用不同颜色或样式区分
+            pen.setStyle(Qt::DotLine);   // 例如用点线表示闭合预览
+            previewClosingSegment->setPen(pen);
+            scene()->addItem(previewClosingSegment);
+        }
+        previewClosingSegment->setLine(effectiveMousePos.x(), effectiveMousePos.y(), polylinePoints.first().x(), polylinePoints.first().y());
+        previewClosingSegment->setVisible(true);
+    } else {
+        if (previewClosingSegment) {
+            previewClosingSegment->setVisible(false);
+        }
+    }
 }
+
 
 void GraphicsToolView::handleNoneModePress(QMouseEvent *event)
 {
@@ -648,17 +695,22 @@ void GraphicsToolView::handleGroupRelease()
     isDraggingSelectionGroup = false;
     isCtrlPressedForCopy = false;
 }
-
 void GraphicsToolView::cleanupDrawing()
 {
     qDebug() << "清理绘制状态，当前模式：" << static_cast<int>(currentMode);
-    if (previewLine) {
+    if (previewLine) { //
         scene()->removeItem(previewLine);
         delete previewLine;
         previewLine = nullptr;
     }
-    startPoint = QPointF();
-    endPoint = QPointF();
+    if (previewClosingSegment) { // 新增清理
+        scene()->removeItem(previewClosingSegment);
+        delete previewClosingSegment;
+        previewClosingSegment = nullptr;
+    }
+    startPoint = QPointF(); //
+    endPoint = QPointF();   //
+
     if (isDrawingPolyline || !polylinePoints.isEmpty() || currentPolyline) {
         qDebug() << "清理折线绘制残留";
         polylinePoints.clear();
@@ -668,8 +720,8 @@ void GraphicsToolView::cleanupDrawing()
             currentPolyline = nullptr;
         }
         isDrawingPolyline = false;
-        closePolylineOnFinish = false;
     }
+    closePolylineOnFinish = false; // 重置闭合状态
     isDragging = false;
 }
 
