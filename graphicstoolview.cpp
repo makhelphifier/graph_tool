@@ -513,8 +513,9 @@ void GraphicsToolView::handleLineModePress(QMouseEvent *event)
         previewLine = new EditableLineItem(startPoint, startPoint);
         QPen pen = previewLine->pen();
         pen.setColor(drawingColor);
-        pen.setStyle(Qt::DashLine);
+        pen.setStyle(Qt::SolidLine);
         previewLine->setPen(pen);
+        previewLine->setSelected(false); // 取消选中状态
         scene()->addItem(previewLine);
     } else {
         endPoint = scenePos;
@@ -523,6 +524,7 @@ void GraphicsToolView::handleLineModePress(QMouseEvent *event)
         QPen pen = line->pen();
         pen.setColor(drawingColor);
         line->setPen(pen);
+        line->setSelected(false);
         scene()->addItem(line);
         qDebug() << "创建直线，从" << startPoint << "到" << endPoint;
         cleanupDrawing();
