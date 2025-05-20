@@ -303,7 +303,7 @@ void GraphicsToolView::handlePolylineModePress(QMouseEvent *event)
         previewLine = new EditableLineItem(polylinePoints.last(), scenePos);
         QPen pen = previewLine->pen();
         pen.setColor(drawingColor);
-        pen.setStyle(Qt::DashLine);
+        pen.setStyle(Qt::SolidLine);
         previewLine->setPen(pen);
         scene()->addItem(previewLine);
     }
@@ -347,7 +347,7 @@ void GraphicsToolView::updatePolylinePreview(const QPointF& currentMousePos)
         previewLine = new EditableLineItem(lastPoint, effectiveMousePos);
         QPen pen = previewLine->pen();
         pen.setColor(drawingColor);
-        pen.setStyle(Qt::DashLine);
+        pen.setStyle(Qt::SolidLine);
         previewLine->setPen(pen);
         scene()->addItem(previewLine);
     }
@@ -493,7 +493,8 @@ void GraphicsToolView::handleItemSelection(const QPointF &scenePos, qreal tolera
 
 void GraphicsToolView::handleLineModePress(QMouseEvent *event)
 {
-    selectedItems.clear();
+    // cleanupSelection();
+    qDebug()<<"selectedItems.size "<< selectedItems.size();
     if (event->button() != Qt::LeftButton) return;
     QPointF scenePos = mapToScene(event->pos());
     if (isShiftPressed && !startPoint.isNull()) {
@@ -527,7 +528,8 @@ void GraphicsToolView::handleLineModePress(QMouseEvent *event)
         pen.setColor(drawingColor);
         line->setPen(pen);
         line->setSelected(false);
-        scene()->addItem(line);
+        scene()->addItem(previewLine);
+        previewLine = nullptr;
         qDebug() << "创建直线，从" << startPoint << "到" << endPoint;
         cleanupDrawing();
         setDrawingMode(DrawingMode::None); selectedItems.clear();
