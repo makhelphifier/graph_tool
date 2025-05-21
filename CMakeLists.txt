@@ -17,7 +17,6 @@ set(PROJECT_SOURCES
         mainwindow.cpp
         mainwindow.h
         mainwindow.ui
-        imagecanvas.h imagecanvas.cpp
         colorselectorpopup.h colorselectorpopup.cpp
 )
 
@@ -27,7 +26,6 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         ${PROJECT_SOURCES}
         graphmanager.h graphmanager.cpp
         newimagedialog.h newimagedialog.cpp
-        imagecanvas.h imagecanvas.cpp
         colorselectorpopup.h colorselectorpopup.cpp
         colorframe.h colorframe.cpp
         graphicstoolview.h graphicstoolview.cpp

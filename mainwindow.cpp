@@ -39,7 +39,7 @@ MainWindow::MainWindow(QWidget *parent)
     QPushButton *drawTextButton = new QPushButton("输入文字");
     toolBar->addWidget(drawTextButton);
     connect(drawTextButton, &QPushButton::clicked, this, [=]() {
-        imageCanvas->setDrawingMode(ImageCanvas::DrawingMode::Text);
+        graphicsView->setDrawingMode(GraphicsToolView::DrawingMode::Text);
     });
 
     QPushButton *drawLineButton = new QPushButton("画线段");
@@ -72,25 +72,25 @@ MainWindow::MainWindow(QWidget *parent)
     QPushButton *drawRectangleButton = new QPushButton("画矩形");
     toolBar->addWidget(drawRectangleButton);
     connect(drawRectangleButton, &QPushButton::clicked, this, [=]() {
-        imageCanvas->setDrawingMode(ImageCanvas::DrawingMode::Rectangle);
+        graphicsView->setDrawingMode(GraphicsToolView::DrawingMode::Rectangle);
     });
 
     QPushButton *drawEllipseButton = new QPushButton("画椭圆");
     toolBar->addWidget(drawEllipseButton);
     connect(drawEllipseButton, &QPushButton::clicked, this, [=]() {
-        imageCanvas->setDrawingMode(ImageCanvas::DrawingMode::Ellipse);
+        graphicsView->setDrawingMode(GraphicsToolView::DrawingMode::Ellipse);
     });
 
     QPushButton *drawArcButton = new QPushButton("画圆弧");
     toolBar->addWidget(drawArcButton);
     connect(drawArcButton, &QPushButton::clicked, this, [=]() {
-        imageCanvas->setDrawingMode(ImageCanvas::DrawingMode::Arc);
+        graphicsView->setDrawingMode(GraphicsToolView::DrawingMode::Arc);
     });
 
     QPushButton *drawPolygonButton = new QPushButton("画多边形");
     toolBar->addWidget(drawPolygonButton);
     connect(drawPolygonButton, &QPushButton::clicked, this, [=]() {
-        imageCanvas->setDrawingMode(ImageCanvas::DrawingMode::Polygon);
+        graphicsView->setDrawingMode(GraphicsToolView::DrawingMode::Polygon);
     });
 
     lineColorButton = new QToolButton(this);
@@ -165,7 +165,9 @@ void MainWindow::newFileWindow() {
 void MainWindow::displayNewImage(const QString &imageName) {
     QPixmap blankImage(800, 600);
     blankImage.fill(Qt::white);
-    imageCanvas->setImage(blankImage);
+    if(scene){
+        scene->clear();
+    }
 }
 
 void MainWindow::initMenu(){

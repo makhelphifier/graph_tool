@@ -3,15 +3,13 @@
 
 #include <QMainWindow>
 #include <QLabel>
-#include "imagecanvas.h"
 #include "newimagedialog.h"
-
 #include <QColor> // *** 新增：包含 QColor ***
 #include <QGraphicsView> // Include QGraphicsView
 #include <QGraphicsScene> // Include QGraphicsScene
 #include <QActionGroup>   // For managing tool actions
 #include "graphicstoolview.h"
-
+#include <QToolButton>
 class ColorSelectorPopup; // *** 新增 ***
 
 
@@ -50,9 +48,6 @@ private slots: // *** 新增：私有槽 ***
 private:
     Ui::MainWindow *ui;
     QLabel *imageLabel;
-    ImageCanvas *imageCanvas;
-
-
 
     // --- Graphics View Related ---
     QGraphicsScene *scene;       // The scene to hold items
