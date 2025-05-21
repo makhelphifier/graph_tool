@@ -20,29 +20,32 @@
 #include <QJsonArray>
 #include <QFile>
 #include <QDir>
+
 class GraphManager : public QMainWindow
 {
     Q_OBJECT
 public:
-    explicit GraphManager(QWidget *parent = nullptr);
-    ~GraphManager(); // 添加析构函数以确保保存
-    QTreeWidgetItem *jsonToItem(const QJsonObject &obj) const;
-    QJsonObject itemToJson(QTreeWidgetItem *item) const;
+    explicit GraphManager(QWidget *parent = nullptr); // 构造函数
+    ~GraphManager(); // 析构函数，确保保存
+    QTreeWidgetItem *jsonToItem(const QJsonObject &obj) const; // JSON转树项
+    QJsonObject itemToJson(QTreeWidgetItem *item) const; // 树项转JSON
     void saveTreeToFile(); // 保存树到文件
     void loadTreeFromFile(); // 从文件加载树
     QString getSaveFilePath() const; // 获取保存文件路径
-    void initializeDefaultTree();
-    QTreeWidget* getTreeWidget();
+    void initializeDefaultTree(); // 初始化默认树
+    QTreeWidget* getTreeWidget(); // 获取树控件
+
 public slots:
-    void showContextMenu(const QPoint &pos);
-    void addChildItem(QTreeWidgetItem *parentItem);
-    void editItem(QTreeWidgetItem *item);
-    void deleteItem(QTreeWidgetItem *item);
+    void showContextMenu(const QPoint &pos); // 显示右键菜单
+    void addChildItem(QTreeWidgetItem *parentItem); // 添加子项
+    void editItem(QTreeWidgetItem *item); // 编辑项
+    void deleteItem(QTreeWidgetItem *item); // 删除项
+
 private slots:
-    // void GraphManager::showContextMenu(const QPoint &pos) ;
+               // void GraphManager::showContextMenu(const QPoint &pos); // 右键菜单槽（注释）
 
 private:
-    QTreeWidget *treeWidget ;
+    QTreeWidget *treeWidget; // 树控件
 
 signals:
 };

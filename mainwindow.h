@@ -4,21 +4,20 @@
 #include <QMainWindow>
 #include <QLabel>
 #include "newimagedialog.h"
-#include <QColor> // *** 新增：包含 QColor ***
-#include <QGraphicsView> // Include QGraphicsView
-#include <QGraphicsScene> // Include QGraphicsScene
-#include <QActionGroup>   // For managing tool actions
+#include <QColor> // 包含 QColor
+#include <QGraphicsView> // 包含 QGraphicsView
+#include <QGraphicsScene> // 包含 QGraphicsScene
+#include <QActionGroup> // 用于管理工具动作
 #include "graphicstoolview.h"
 #include <QToolButton>
-class ColorSelectorPopup; // *** 新增 ***
 
+class ColorSelectorPopup; // 前向声明
 
 enum class ToolType {
-    Select,
-    Line
-    // Add other tools later
+    Select, // 选择工具
+    Line    // 直线工具
+    // 后续添加其他工具
 };
-
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -31,43 +30,41 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    MainWindow(QWidget *parent = nullptr);
-    ~MainWindow();
+    MainWindow(QWidget *parent = nullptr); // 构造函数
+    ~MainWindow(); // 析构函数
 
-    void initMenu();
+    void initMenu(); // 初始化菜单
+
 public slots:
-    void newFileWindow();
-    void graphManagementWindow();
-    void displayNewImage(const QString &imageName);
+    void newFileWindow(); // 新建文件窗口
+    void graphManagementWindow(); // 图形管理窗口
+    void displayNewImage(const QString &imageName); // 显示新图像
 
-private slots: // *** 新增：私有槽 ***
-    void onColorSelected(const QColor &color);
-    void closeColorPopup(); // 用于关闭弹窗的槽
-
+private slots:
+    void onColorSelected(const QColor &color); // 颜色选择处理
+    void closeColorPopup(); // 关闭颜色弹窗
 
 private:
     Ui::MainWindow *ui;
-    QLabel *imageLabel;
+    QLabel *imageLabel; // 图像标签
 
-    // --- Graphics View Related ---
-    QGraphicsScene *scene;       // The scene to hold items
-    GraphicsToolView *graphicsView; // The view to display the scene
-        // OR: Replace with your custom GraphicsView subclass if you create one
+    // 图形视图相关
+    QGraphicsScene *scene; // 场景，持有图形项
+    GraphicsToolView *graphicsView; // 视图，显示场景
 
-    // --- Tool Management ---
-    QActionGroup *toolActionGroup; // Group for tool actions (radio button behavior)
-    ToolType currentTool = ToolType::Select; // Track the currently selected tool
+    // 工具管理
+    QActionGroup *toolActionGroup; // 工具动作组（单选行为）
+    ToolType currentTool = ToolType::Select; // 当前选中的工具
 
-    // Actions for tools
-    QAction *selectAction;
-    QAction *lineAction;
+    // 工具动作
+    QAction *selectAction; // 选择工具动作
+    QAction *lineAction; // 直线工具动作
 
+    // 颜色选择相关
+    QToolButton *lineColorButton = nullptr; // 线条颜色按钮
+    QColor currentLineColor = Qt::black; // 当前线条颜色
+    ColorSelectorPopup *colorPopup = nullptr; // 颜色选择弹窗
 
-    // --- 颜色选择相关 ---
-    QToolButton *lineColorButton = nullptr; // *** 新增 ***
-    QColor currentLineColor = Qt::black;  // *** 新增：存储当前颜色 ***
-    ColorSelectorPopup *colorPopup = nullptr; // *** 新增 ***
-
-    void updateLineColorButtonIcon(); // *** 新增：更新按钮外观的辅助函数 ***
+    void updateLineColorButtonIcon(); // 更新线条颜色按钮图标
 };
 #endif // MAINWINDOW_H

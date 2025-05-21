@@ -8,30 +8,30 @@
 #include <QPushButton>
 #include <QTreeWidget>
 #include <QListWidget>
-#include <QPushButton>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QSplitter>
+
 class NewImageDialog : public QDialog
 {
     Q_OBJECT
 public:
-    NewImageDialog(QWidget *parent = nullptr);
+    NewImageDialog(QWidget *parent = nullptr); // 构造函数
     void loadTreeFromFile(); // 从文件加载树
-
-    void initializeDefaultTree();
-    QString getSaveFilePath() const;
-    void addNewImage() {
-        // 添加新图片名
-        QString imageName = QString("image%1.png").arg(imageCount++);
-        imageList->addItem(imageName);
+    void initializeDefaultTree(); // 初始化默认树
+    QString getSaveFilePath() const; // 获取保存文件路径
+    void addNewImage() { // 添加新图片
+        QString imageName = QString("image%1.png").arg(imageCount++); // 生成图片名
+        imageList->addItem(imageName); // 添加到列表
     }
+
 signals:
     void imageCreated(const QString &imageName); // 新建图片信号
+
 private:
-    QTreeWidget *treeWidget ;
-    QListWidget *imageList;
-    int imageCount;
+    QTreeWidget *treeWidget; // 树控件
+    QListWidget *imageList; // 图片列表
+    int imageCount; // 图片计数
 };
 
 #endif // NEWIMAGEDIALOG_H
