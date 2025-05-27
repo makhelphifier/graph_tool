@@ -10,6 +10,11 @@
 #include <QKeyEvent>
 #include "colorselectorpopup.h"
 #include "editablepolylineitem.h"
+#include <QGraphicsEllipseItem> // 新增：包含椭圆项
+#include <QGraphicsPathItem> // 新增：用于绘制路径，包括圆弧
+#include <QPainterPath>      // 新增：用于定义路径
+#include <QGraphicsPolygonItem> // 新增：用于绘制多边形
+#include <QGraphicsTextItem> // 新增：用于显示文本
 
 #include <QTime>
 
@@ -45,6 +50,35 @@ public slots:
     void onColorSelected(const QColor &color); // 处理颜色选择信号
 
 public:
+
+    // 新增文本模式处理函数
+    void handleTextModePress(QMouseEvent *event);
+    // 文本模式下，移动和释放可能不需要特殊处理，主要在按下时创建
+
+
+    // 新增多边形模式处理函数
+    void handlePolygonModePress(QMouseEvent *event);
+    void handlePolygonModeMove(QMouseEvent *event);
+    void finishPolygon(); // 结束多边形绘制 (可能与折线共用部分逻辑)
+
+
+    // 新增圆弧模式处理函数
+    void handleArcModePress(QMouseEvent *event);
+    void handleArcModeMove(QMouseEvent *event);
+    void handleArcModeRelease(QMouseEvent *event); // 第三次点击可以视为释放来完成
+
+
+    // 新增矩形模式处理函数
+    void handleRectangleModePress(QMouseEvent *event);
+    void handleRectangleModeMove(QMouseEvent *event);
+    void handleRectangleModeRelease(QMouseEvent *event);
+    // 新增椭圆模式处理函数
+    void handleEllipseModePress(QMouseEvent *event);
+    void handleEllipseModeMove(QMouseEvent *event);
+    void handleEllipseModeRelease(QMouseEvent *event);
+
+
+
     void wheelEvent(QWheelEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
@@ -105,6 +139,40 @@ private:
 
     EditableLineItem *previewClosingSegment = nullptr; // 闭合预览线（从鼠标到第一个点） // 新增
 
+
+
+    // 矩形绘制相关
+    QGraphicsRectItem *previewRect = nullptr; // 新增：预览矩形
+    QPointF rectStartPoint; // 新增：矩形绘制的起始点
+
+
+    // 椭圆绘制相关 (新增)
+    QGraphicsEllipseItem *previewEllipse = nullptr; // 新增：预览椭圆
+    QPointF ellipseStartPoint; // 新增：椭圆绘制的起始点 (与rectStartPoint功能类似，但可以分开管理)
+
+
+
+    // 圆弧绘制相关 (新增)
+    enum class ArcDrawingState {
+        DefineCenter,     // 定义圆心
+        DefineRadiusStart, // 定义半径和起始点
+        DefineEnd         // 定义结束点/角度
+    };
+    ArcDrawingState currentArcState;
+    QPointF arcCenterPoint;
+    QPointF arcRadiusStartPoint;
+    QGraphicsPathItem *previewArc = nullptr; // 预览圆弧
+
+    // 多边形绘制相关 (新增)
+    // 注意：多边形绘制逻辑与折线非常相似，可以复用许多变量
+    // bool isDrawingPolygon = false; // 可以复用 isDrawingPolyline
+    // QVector<QPointF> polygonPoints; // 可以复用 polylinePoints
+    QGraphicsPolygonItem *previewPolygon = nullptr; // 预览多边形
+    // EditablePolylineItem *currentPolyline = nullptr; // 这个可能需要调整为 QGraphicsPolygonItem
+
+
+    // 文本绘制相关 (新增)
+    // QPointF textInsertionPoint; // 如果需要预览或更复杂逻辑
 };
 
 #endif // GRAPHICSTOOLVIEW_H

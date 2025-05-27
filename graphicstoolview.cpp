@@ -20,7 +20,12 @@ GraphicsToolView::GraphicsToolView(QGraphicsScene *scene, QWidget *parent)
     isDrawingPolyline(false),
     draggedHandleIndex(-1),
     closePolylineOnFinish(false),
-    previewClosingSegment(nullptr)
+    previewClosingSegment(nullptr), // 初始化闭合预览线段,
+    previewRect(nullptr),
+    currentArcState(ArcDrawingState::DefineCenter), // 初始化圆弧绘制状态
+    previewArc(nullptr),
+    previewPolygon(nullptr) // 初始化预览多边形指针
+
 {
     setRenderHint(QPainter::Antialiasing);
 }
@@ -67,45 +72,176 @@ void GraphicsToolView::setDrawingMode(DrawingMode mode)
     cleanupDrawing();
     cleanupSelection();
     switch (mode) {
-    case DrawingMode::None:
-        setCursor(Qt::ArrowCursor);
-        setMouseTracking(false);
+    case DrawingMode::None: // 无模式
+        setCursor(Qt::ArrowCursor); // 设置箭头光标
+        setMouseTracking(false); // 关闭鼠标追踪
         break;
-    case DrawingMode::Line:
+    case DrawingMode::Polygon: // 多边形模式
         setCursor(Qt::CrossCursor);
-        setMouseTracking(true);
-        qDebug() << "进入直线模式";
+        setMouseTracking(true); // 多边形绘制通常需要鼠标追踪
+        qDebug() << "Entered Polygon Mode";
         break;
-    case DrawingMode::Polyline:
+    case DrawingMode::Text: // 文本模式
+        setCursor(Qt::IBeamCursor); // 文本输入通常用 IBeam 光标
+        setMouseTracking(false);    // 单击放置文本，不需要持续追踪
+        qDebug() << "Entered Text Mode";
+        break;
+    case DrawingMode::Ellipse: // 椭圆模式也用十字光标
         setCursor(Qt::CrossCursor);
-        setMouseTracking(true);
-        qDebug() << "进入折线模式";
+        setMouseTracking(true); // 椭圆绘制通常需要鼠标追踪
+        qDebug() << "Entered Ellipse Mode";
+        break;
+    case DrawingMode::Rectangle: // 矩形模式也用十字光标
+        setCursor(Qt::CrossCursor);
+        setMouseTracking(true); // 矩形绘制通常需要鼠标追踪
+        qDebug() << "Entered Rectangle Mode";
+        break;
+    case DrawingMode::Line: // 直线模式
+        setCursor(Qt::CrossCursor); // 设置十字光标
+        setMouseTracking(true); // 启用鼠标追踪
+        qDebug() << "进入直线模式"; // 打印进入直线模式信息
+        break;
+    case DrawingMode::Polyline: // 折线模式
+        setCursor(Qt::CrossCursor); // 设置十字光标
+        setMouseTracking(true); // 启用鼠标追踪
+        qDebug() << "进入折线模式"; // 打印进入折线模式信息
+        break;
+    case DrawingMode::Arc: // 圆弧模式
+        setCursor(Qt::CrossCursor);
+        setMouseTracking(true); // 圆弧绘制需要鼠标追踪
+        currentArcState = ArcDrawingState::DefineCenter; // 重置圆弧绘制状态
+        qDebug() << "Entered Arc Mode";
         break;
     default:
-        setCursor(Qt::ArrowCursor);
-        setMouseTracking(false);
+        setCursor(Qt::ArrowCursor); // 默认箭头光标
+        setMouseTracking(false); // 关闭鼠标追踪
         break;
     }
 }
 
+
+
 void GraphicsToolView::mousePressEvent(QMouseEvent *event)
 {
-    qDebug() << "鼠标按下事件，按钮：" << event->button();
-    bool isCtrlPressed = event->modifiers() & Qt::ControlModifier;
+    qDebug() << "鼠标按下事件，按钮：" << event->button(); // 打印鼠标按下信息
+    bool isCtrlPressed = event->modifiers() & Qt::ControlModifier; // 检查Ctrl键状态
     if (currentMode == DrawingMode::None) {
-        qDebug() << "处理无模式按下事件";
-        handleNoneModePress(event);
+        qDebug() << "处理无模式按下事件"; // 打印无模式处理信息
+        handleNoneModePress(event); // 处理无模式按下
     } else if (currentMode == DrawingMode::Line) {
-        qDebug() << "处理直线模式按下事件";
-        handleLineModePress(event);
+        qDebug() << "处理直线模式按下事件"; // 打印直线模式处理信息
+        handleLineModePress(event); // 处理直线模式按下
     } else if (currentMode == DrawingMode::Polyline) {
         if (event->button() == Qt::LeftButton) {
-            qDebug() << "处理折线模式按下事件（左键）";
-            handlePolylineModePress(event);
+            qDebug() << "处理折线模式按下事件（左键）"; // 打印折线模式左键信息
+            handlePolylineModePress(event); // 处理折线模式按下
         }
+    } else if (currentMode == DrawingMode::Rectangle) { // 新增
+        handleRectangleModePress(event);
+    }else if (currentMode == DrawingMode::Ellipse) { // 新增
+        handleEllipseModePress(event);
+    }else   if (currentMode == DrawingMode::Arc) {
+        handleArcModePress(event); // 调用圆弧模式的按下处理
+    }else if (currentMode == DrawingMode::Polygon) { // 新增多边形模式处理
+        if (event->button() == Qt::LeftButton) {
+            handlePolygonModePress(event);
+        } else if (event->button() == Qt::RightButton && isDrawingPolyline) { // 右键结束绘制
+            finishPolygon();
+        }
+    }else    if (currentMode == DrawingMode::Text) { // 新增文本模式处理
+        handleTextModePress(event);
+        event->accept(); // 标记事件已处理
     }
-    QGraphicsView::mousePressEvent(event);
+    QGraphicsView::mousePressEvent(event); // 调用基类处理
 }
+
+
+
+void GraphicsToolView::mouseMoveEvent(QMouseEvent *event)
+{
+    QPointF scenePos = mapToScene(event->pos()); // 映射到场景坐标
+    updateCursorBasedOnPosition(scenePos); // 更新光标样式
+    if (currentMode == DrawingMode::Line && !startPoint.isNull() && isDragging) {
+        handleLineModeMove(event); // 处理直线模式移动
+    } else if (currentMode == DrawingMode::Polyline && isDrawingPolyline && isDragging) {
+        handlePolylineModeMove(event); // 处理折线模式移动
+    } else if (currentMode == DrawingMode::None && draggedHandle && draggedItem) {
+        handleHandleMove(event); // 处理端点移动
+    } else if (currentMode == DrawingMode::None && isDraggingSelectionGroup && !selectedItems.isEmpty()) {
+        handleGroupMove(event); // 处理选中组移动
+    }else if (currentMode == DrawingMode::Rectangle) { // 新增
+        handleRectangleModeMove(event);
+    }else if (currentMode == DrawingMode::Ellipse) { // 新增
+        handleEllipseModeMove(event);
+    }else if (currentMode == DrawingMode::Arc) { // 修改: 检查是否在拖动或处于特定Arc状态
+        if (isDragging || currentArcState == ArcDrawingState::DefineRadiusStart || currentArcState == ArcDrawingState::DefineEnd) {
+            handleArcModeMove(event);
+        }
+    }else if (currentMode == DrawingMode::Polygon && isDrawingPolyline) { // 新增
+        handlePolygonModeMove(event);
+    }
+
+}
+
+void GraphicsToolView::mouseReleaseEvent(QMouseEvent *event)
+{
+    qDebug() << "鼠标释放事件"; // 打印释放信息
+    if (currentMode == DrawingMode::Line && !startPoint.isNull() && isDragging) {
+        // 直线模式释放处理（未实现具体逻辑）
+    } else if (currentMode == DrawingMode::None && draggedHandle) {
+        handleHandleRelease(); // 处理端点释放
+    } else if (currentMode == DrawingMode::None && isDraggingSelectionGroup) {
+        handleGroupRelease(); // 处理选中组释放
+    }else if (currentMode == DrawingMode::Rectangle) { // 新增
+        handleRectangleModeRelease(event);
+    }else if (currentMode == DrawingMode::Ellipse && isDragging) { // 新增
+        handleEllipseModeRelease(event);
+    }else   if (currentMode == DrawingMode::Arc && isDragging) { // 修改: 检查是否在拖动绘制圆弧
+        // 如果你的设计是第三次点击完成，则这里的release可能主要用于重置isDragging
+        // 如果设计是第二次点击后拖动确定第三点，则在这里调用handleArcModeRelease
+        // 根据你给的描述“第三次点击确定结束点（或者拖动确定结束角度）”，
+        // 我们的press已经处理了第三次点击。如果拖动确定结束角度，则需要release
+        // handleArcModeRelease(event); // 暂时注释，因为press处理了三点
+    }
+
+    if (!event->isAccepted()) {
+        QGraphicsView::mouseReleaseEvent(event); // 调用基类处理
+    }
+}
+
+// void GraphicsToolView::mouseReleaseEvent(QMouseEvent *event)
+// {
+//     qDebug() << "鼠标释放事件";
+//     if (currentMode == DrawingMode::Line && !startPoint.isNull() && isDragging) {
+//     } else if (currentMode == DrawingMode::None && draggedHandle) {
+//         handleHandleRelease();
+//     } else if (currentMode == DrawingMode::None && isDraggingSelectionGroup) {
+//         handleGroupRelease();
+//     }
+//     if (!event->isAccepted()) {
+//         QGraphicsView::mouseReleaseEvent(event);
+//     }
+// }
+
+
+// void GraphicsToolView::mousePressEvent(QMouseEvent *event,int a )
+// {
+//     qDebug() << "鼠标按下事件，按钮：" << event->button();
+//     bool isCtrlPressed = event->modifiers() & Qt::ControlModifier;
+//     if (currentMode == DrawingMode::None) {
+//         qDebug() << "处理无模式按下事件";
+//         handleNoneModePress(event);
+//     } else if (currentMode == DrawingMode::Line) {
+//         qDebug() << "处理直线模式按下事件";
+//         handleLineModePress(event);
+//     } else if (currentMode == DrawingMode::Polyline) {
+//         if (event->button() == Qt::LeftButton) {
+//             qDebug() << "处理折线模式按下事件（左键）";
+//             handlePolylineModePress(event);
+//         }
+//     }
+//     QGraphicsView::mousePressEvent(event);
+// }
 
 void GraphicsToolView::mouseDoubleClickEvent(QMouseEvent *event)
 {
@@ -114,26 +250,31 @@ void GraphicsToolView::mouseDoubleClickEvent(QMouseEvent *event)
         qDebug() << "折线双击：结束折线绘制";
         finishPolyline();
         event->accept();
+    } else if (event->button() == Qt::LeftButton && currentMode == DrawingMode::Polygon && isDrawingPolyline) {
+        qDebug() << "多边形双击：结束多边形绘制";
+        finishPolygon();
+        event->accept();
     } else {
-        qDebug() << "非折线结束双击，传递给基类";
+        qDebug() << "非折线或多边形结束双击，传递给基类";
         QGraphicsView::mouseDoubleClickEvent(event);
     }
 }
 
-void GraphicsToolView::mouseMoveEvent(QMouseEvent *event)
-{
-    QPointF scenePos = mapToScene(event->pos());
-    updateCursorBasedOnPosition(scenePos);
-    if (currentMode == DrawingMode::Line && !startPoint.isNull() && isDragging) {
-        handleLineModeMove(event);
-    } else if (currentMode == DrawingMode::Polyline && isDrawingPolyline && isDragging) {
-        handlePolylineModeMove(event);
-    } else if (currentMode == DrawingMode::None && draggedHandle && draggedItem) {
-        handleHandleMove(event);
-    } else if (currentMode == DrawingMode::None && isDraggingSelectionGroup && !selectedItems.isEmpty()) {
-        handleGroupMove(event);
-    }
-}
+
+// void GraphicsToolView::mouseMoveEvent(QMouseEvent *event)
+// {
+//     QPointF scenePos = mapToScene(event->pos());
+//     updateCursorBasedOnPosition(scenePos);
+//     if (currentMode == DrawingMode::Line && !startPoint.isNull() && isDragging) {
+//         handleLineModeMove(event);
+//     } else if (currentMode == DrawingMode::Polyline && isDrawingPolyline && isDragging) {
+//         handlePolylineModeMove(event);
+//     } else if (currentMode == DrawingMode::None && draggedHandle && draggedItem) {
+//         handleHandleMove(event);
+//     } else if (currentMode == DrawingMode::None && isDraggingSelectionGroup && !selectedItems.isEmpty()) {
+//         handleGroupMove(event);
+//     }
+// }
 
 void GraphicsToolView::wheelEvent(QWheelEvent *event)
 {
@@ -635,19 +776,6 @@ void GraphicsToolView::handleGroupMove(QMouseEvent *event)
     qDebug() << "拖动选中组，偏移量：" << offset;
 }
 
-void GraphicsToolView::mouseReleaseEvent(QMouseEvent *event)
-{
-    qDebug() << "鼠标释放事件";
-    if (currentMode == DrawingMode::Line && !startPoint.isNull() && isDragging) {
-    } else if (currentMode == DrawingMode::None && draggedHandle) {
-        handleHandleRelease();
-    } else if (currentMode == DrawingMode::None && isDraggingSelectionGroup) {
-        handleGroupRelease();
-    }
-    if (!event->isAccepted()) {
-        QGraphicsView::mouseReleaseEvent(event);
-    }
-}
 
 void GraphicsToolView::handleLineModeRelease(QMouseEvent *event)
 {
@@ -804,4 +932,435 @@ void GraphicsToolView::pasteCopiedItems()
         }
     }
     qDebug() << "粘贴图形总数：" << selectedItems.size();
+}
+
+
+
+// 处理椭圆模式下的鼠标按下事件
+void GraphicsToolView::handleEllipseModePress(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton) {
+        ellipseStartPoint = mapToScene(event->pos()); // 记录椭圆绘制的起始点
+        isDragging = true; // 开始拖动绘制椭圆
+
+        // 初始化预览椭圆
+        if (previewEllipse) {
+            scene()->removeItem(previewEllipse);
+            delete previewEllipse;
+            previewEllipse = nullptr;
+        }
+        // 创建一个大小为0的预览椭圆
+        previewEllipse = new QGraphicsEllipseItem(QRectF(ellipseStartPoint, ellipseStartPoint));
+        QPen pen(drawingColor, 1, Qt::DashLine); // 使用虚线预览
+        previewEllipse->setPen(pen);
+        scene()->addItem(previewEllipse);
+        qDebug() << "Ellipse drawing started at:" << ellipseStartPoint;
+    }
+}
+
+// 处理椭圆模式下的鼠标移动事件
+void GraphicsToolView::handleEllipseModeMove(QMouseEvent *event)
+{
+    if (isDragging && previewEllipse) {
+        QPointF currentScenePos = mapToScene(event->pos());
+        QRectF newRect = QRectF(ellipseStartPoint, currentScenePos).normalized(); // 椭圆也由矩形边界定义
+        previewEllipse->setRect(newRect);
+        qDebug() << "Ellipse preview updated to rect:" << newRect;
+    }
+}
+
+// 处理椭圆模式下的鼠标释放事件
+void GraphicsToolView::handleEllipseModeRelease(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton && isDragging) {
+        QPointF currentScenePos = mapToScene(event->pos());
+        QRectF finalRect = QRectF(ellipseStartPoint, currentScenePos).normalized();
+
+        // 移除预览椭圆
+        if (previewEllipse) {
+            scene()->removeItem(previewEllipse);
+            delete previewEllipse;
+            previewEllipse = nullptr;
+        }
+
+        // 创建最终的椭圆项
+        if (finalRect.width() > 0 && finalRect.height() > 0) { // 确保椭圆有效
+            QGraphicsEllipseItem *ellipseItem = new QGraphicsEllipseItem(finalRect);
+            QPen pen(drawingColor, 2, Qt::SolidLine); // 最终椭圆用实线
+            ellipseItem->setPen(pen);
+            // ellipseItem->setBrush(drawingColor); // 如果需要填充颜色
+            scene()->addItem(ellipseItem);
+            qDebug() << "Ellipse drawn with bounding rect:" << finalRect << "with color" << drawingColor;
+        } else {
+            qDebug() << "Ellipse too small, not drawn.";
+        }
+
+        isDragging = false;
+        ellipseStartPoint = QPointF(); // 重置起始点
+        // setDrawingMode(DrawingMode::None); // 绘制完毕后可以切换回None模式
+    }
+}
+
+
+// 处理圆弧模式下的鼠标按下事件
+void GraphicsToolView::handleArcModePress(QMouseEvent *event)
+{
+    if (event->button() != Qt::LeftButton) return;
+
+    QPointF scenePos = mapToScene(event->pos());
+
+    if (currentArcState == ArcDrawingState::DefineCenter) {
+        arcCenterPoint = scenePos;
+        currentArcState = ArcDrawingState::DefineRadiusStart;
+        qDebug() << "Arc center set at:" << arcCenterPoint;
+
+        // 初始化预览圆弧 (一个点，或者暂时不显示)
+        if (previewArc) {
+            scene()->removeItem(previewArc);
+            delete previewArc;
+        }
+        previewArc = new QGraphicsPathItem();
+        QPen pen(drawingColor, 1, Qt::DashLine);
+        previewArc->setPen(pen);
+        scene()->addItem(previewArc);
+
+    } else if (currentArcState == ArcDrawingState::DefineRadiusStart) {
+        arcRadiusStartPoint = scenePos;
+        currentArcState = ArcDrawingState::DefineEnd;
+        qDebug() << "Arc radius/start point set at:" << arcRadiusStartPoint;
+        // 此时可以开始绘制预览圆弧的起始部分，或等待第三点
+    } else if (currentArcState == ArcDrawingState::DefineEnd) {
+        // 第三次点击完成绘制
+        QPointF arcEndPoint = scenePos;
+        qreal radius = QLineF(arcCenterPoint, arcRadiusStartPoint).length();
+        if (radius <= 0) {
+            cleanupDrawing();
+            return;
+        }
+
+        qreal startAngleDegrees = QLineF(arcCenterPoint, arcRadiusStartPoint).angle(); // Qt角度定义
+        qreal endAngleDegrees = QLineF(arcCenterPoint, arcEndPoint).angle();
+
+        qreal spanAngleDegrees = endAngleDegrees - startAngleDegrees;
+        // 确保 sweepLength 为正，并调整 startAngle (如果需要逆时针)
+        // Qt 的 QPainterPath::arcTo sweepLength 为正数时通常是逆时针
+        // 如果需要顺时针，可能需要调整或者使用负的 sweepLength (但通常用正值)
+        // 我们这里让 startAngle 总是较小的那个，spanAngle 为正
+        if (spanAngleDegrees < 0) {
+            spanAngleDegrees += 360.0;
+        }
+        if (spanAngleDegrees > 360.0) { // 如果跨越超过360度，一般限制为360
+            spanAngleDegrees = 360.0;
+        }
+
+
+        // 移除预览
+        if (previewArc) {
+            scene()->removeItem(previewArc);
+            delete previewArc;
+            previewArc = nullptr;
+        }
+
+        // 创建最终的圆弧项
+        QPainterPath finalPath;
+        QRectF boundingRect(arcCenterPoint.x() - radius, arcCenterPoint.y() - radius, 2 * radius, 2 * radius);
+        // QPainterPath::arcTo 需要角度单位为1/16度，所以乘以16
+        finalPath.arcTo(boundingRect, startAngleDegrees, spanAngleDegrees);
+
+        QGraphicsPathItem *arcItem = new QGraphicsPathItem(finalPath);
+        QPen pen(drawingColor, 2, Qt::SolidLine);
+        arcItem->setPen(pen);
+        scene()->addItem(arcItem);
+
+        qDebug() << "Arc drawn: Center" << arcCenterPoint << "Radius" << radius
+                 << "StartAngle" << startAngleDegrees << "SpanAngle" << spanAngleDegrees;
+
+        cleanupDrawing(); // 重置状态
+    }
+}
+
+// 处理圆弧模式下的鼠标移动事件
+void GraphicsToolView::handleArcModeMove(QMouseEvent *event)
+{
+    if (!isDragging && currentArcState == ArcDrawingState::DefineCenter) return; // 还没开始画
+    if (!previewArc) return;
+
+    QPointF currentScenePos = mapToScene(event->pos());
+    QPainterPath previewPath;
+
+    if (currentArcState == ArcDrawingState::DefineRadiusStart) {
+        // 正在定义半径和起始点，可以画一条从圆心到鼠标的直线作为预览
+        previewPath.moveTo(arcCenterPoint);
+        previewPath.lineTo(currentScenePos);
+        previewArc->setPath(previewPath);
+        qDebug() << "Arc preview: Radius line to" << currentScenePos;
+    } else if (currentArcState == ArcDrawingState::DefineEnd) {
+        // 正在定义结束点/角度
+        qreal radius = QLineF(arcCenterPoint, arcRadiusStartPoint).length();
+        if (radius <= 0) return;
+
+        qreal startAngleDegrees = QLineF(arcCenterPoint, arcRadiusStartPoint).angle();
+        qreal endAngleDegrees = QLineF(arcCenterPoint, currentScenePos).angle();
+
+        qreal spanAngleDegrees = endAngleDegrees - startAngleDegrees;
+        if (spanAngleDegrees < 0) {
+            spanAngleDegrees += 360.0;
+        }
+        if (spanAngleDegrees > 360.0) {
+            spanAngleDegrees = 360.0;
+        }
+
+
+        QRectF boundingRect(arcCenterPoint.x() - radius, arcCenterPoint.y() - radius, 2 * radius, 2 * radius);
+        previewPath.arcTo(boundingRect, startAngleDegrees, spanAngleDegrees);
+        previewArc->setPath(previewPath);
+        qDebug() << "Arc preview: End angle at" << currentScenePos << "Span" << spanAngleDegrees;
+    }
+}
+
+// 圆弧模式下的鼠标释放事件 (如果你的逻辑是点击完成，那么这个函数可能不需要特别处理)
+// 但如果第二次点击后是拖拽确定第三点，那么释放时完成。
+// 目前我们是三次点击完成。
+void GraphicsToolView::handleArcModeRelease(QMouseEvent *event)
+{
+    // 对于三点确定圆弧，主要逻辑在 mousePressEvent 中
+    // 如果是拖拽确定结束角度，则在这里完成
+    if (currentArcState == ArcDrawingState::DefineEnd && isDragging) { // 假设 isDragging 代表正在确定第三点
+        // 与 handleArcModePress 中第三次点击的逻辑类似
+        // 为了避免代码重复，可以将最终绘制逻辑封装成一个函数
+        // 这里简单示意，实际应该复用
+        QPointF arcEndPoint = mapToScene(event->pos());
+        qreal radius = QLineF(arcCenterPoint, arcRadiusStartPoint).length();
+        if (radius <= 0) {
+            cleanupDrawing();
+            return;
+        }
+
+        qreal startAngleDegrees = QLineF(arcCenterPoint, arcRadiusStartPoint).angle();
+        qreal endAngleDegrees = QLineF(arcCenterPoint, arcEndPoint).angle();
+
+        qreal spanAngleDegrees = endAngleDegrees - startAngleDegrees;
+        if (spanAngleDegrees < 0) {
+            spanAngleDegrees += 360.0;
+        }
+        if (spanAngleDegrees > 360.0) {
+            spanAngleDegrees = 360.0;
+        }
+
+        if (previewArc) {
+            scene()->removeItem(previewArc);
+            delete previewArc;
+            previewArc = nullptr;
+        }
+
+        QPainterPath finalPath;
+        QRectF boundingRect(arcCenterPoint.x() - radius, arcCenterPoint.y() - radius, 2 * radius, 2 * radius);
+        finalPath.arcTo(boundingRect, startAngleDegrees, spanAngleDegrees);
+
+        QGraphicsPathItem *arcItem = new QGraphicsPathItem(finalPath);
+        QPen pen(drawingColor, 2, Qt::SolidLine);
+        arcItem->setPen(pen);
+        scene()->addItem(arcItem);
+        qDebug() << "Arc drawn (on release): Center" << arcCenterPoint << "Radius" << radius
+                 << "StartAngle" << startAngleDegrees << "SpanAngle" << spanAngleDegrees;
+
+        cleanupDrawing();
+        isDragging = false; // 确保重置拖动状态
+    }
+}
+
+// 处理多边形模式下的鼠标按下事件
+void GraphicsToolView::handlePolygonModePress(QMouseEvent *event)
+{
+    if (event->button() != Qt::LeftButton) return;
+
+    QPointF scenePos = mapToScene(event->pos());
+
+    if (!isDrawingPolyline) { // 复用 isDrawingPolyline 状态
+        polylinePoints.clear(); // 复用 polylinePoints
+        polylinePoints.append(scenePos);
+        isDrawingPolyline = true; // 标记开始绘制
+        isDragging = true; // 代表鼠标按下状态
+
+        if (previewPolygon) { // 清理旧的预览
+            scene()->removeItem(previewPolygon);
+            delete previewPolygon;
+            previewPolygon = nullptr;
+        }
+        // 创建预览多边形，初始只有一个点，或者可以暂时不创建预览，在move中创建
+        previewPolygon = new QGraphicsPolygonItem();
+        QPen pen(drawingColor, 1, Qt::DashLine);
+        previewPolygon->setPen(pen);
+        scene()->addItem(previewPolygon);
+
+        qDebug() << "Polygon drawing started at:" << scenePos;
+    } else {
+        polylinePoints.append(scenePos);
+        qDebug() << "Polygon point added at:" << scenePos;
+    }
+
+    // 更新预览 (至少需要两个点才能形成有效的预览多边形)
+    if (polylinePoints.size() >= 1 && previewPolygon) { // 至少一个点就可以开始画预览线到鼠标
+        QPolygonF currentQPolygon(polylinePoints);
+        if (isDrawingPolyline && polylinePoints.size() > 0) { // 动态预览线
+            QPointF tempEndPoint = mapToScene(mapFromGlobal(QCursor::pos())); // 获取当前鼠标位置
+            QPolygonF previewQPolygon = currentQPolygon;
+            previewQPolygon.append(tempEndPoint); // 添加当前鼠标位置作为临时终点
+            if (polylinePoints.size() >=2) { // 如果点数多于2个，预览时可以尝试闭合到起点
+                previewQPolygon.append(polylinePoints.first());
+            }
+            previewPolygon->setPolygon(previewQPolygon);
+        }
+    }
+}
+
+// 处理多边形模式下的鼠标移动事件
+void GraphicsToolView::handlePolygonModeMove(QMouseEvent *event)
+{
+    if (!isDrawingPolyline || polylinePoints.isEmpty() || !previewPolygon) return;
+
+    QPointF currentScenePos = mapToScene(event->pos());
+    QPolygonF currentQPolygon(polylinePoints);
+    currentQPolygon.append(currentScenePos); // 添加当前鼠标位置用于预览下一段
+
+    // 为了预览闭合效果，可以临时连接到起点
+    if (polylinePoints.size() >= 2) { // 至少有2个已确定的点，才能预览闭合
+        currentQPolygon.append(polylinePoints.first());
+    }
+    previewPolygon->setPolygon(currentQPolygon);
+    qDebug() << "Polygon preview updated with mouse at:" << currentScenePos;
+}
+
+// 结束多边形绘制
+void GraphicsToolView::finishPolygon()
+{
+    if (isDrawingPolyline) {
+        // 移除预览多边形
+        if (previewPolygon) {
+            scene()->removeItem(previewPolygon);
+            delete previewPolygon;
+            previewPolygon = nullptr;
+        }
+
+        if (polylinePoints.size() >= 3) { // 多边形至少需要3个顶点
+            QPolygonF finalPolygon(polylinePoints);
+            // QGraphicsPolygonItem 默认就是闭合的，它会自动连接最后一个点和第一个点
+            QGraphicsPolygonItem *polygonItem = new QGraphicsPolygonItem(finalPolygon);
+            QPen pen(drawingColor, 2, Qt::SolidLine);
+            polygonItem->setPen(pen);
+            QBrush brush(drawingColor, Qt::SolidPattern); // 可以设置填充
+            brush.setColor(QColor(drawingColor.red(), drawingColor.green(), drawingColor.blue(), 100)); // 半透明填充
+            polygonItem->setBrush(brush);
+            scene()->addItem(polygonItem);
+            qDebug() << "Polygon drawn with" << polylinePoints.size() << "vertices.";
+        } else {
+            qDebug() << "Polygon has less than 3 vertices, discarding.";
+        }
+
+        isDrawingPolyline = false; // 重置状态
+        polylinePoints.clear();
+        isDragging = false;
+        // setDrawingMode(DrawingMode::None); // 绘制完毕后可以切换回None模式
+    }
+}
+
+
+// 处理文本模式下的鼠标按下事件
+void GraphicsToolView::handleTextModePress(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton) {
+        QPointF scenePos = mapToScene(event->pos()); // 获取点击的场景位置
+
+        QGraphicsTextItem *textItem = new QGraphicsTextItem();
+        textItem->setPlainText(QStringLiteral("测试文字")); // 设置默认文字
+        textItem->setPos(scenePos); // 设置文本框位置
+        textItem->setDefaultTextColor(drawingColor); // 使用当前绘图颜色
+
+        // 设置字体 (可选)
+        QFont font = textItem->font();
+        font.setPointSize(12); // 设置字号
+        textItem->setFont(font);
+
+        // 使文本项可移动和可选择 (可选)
+        textItem->setFlag(QGraphicsItem::ItemIsMovable);
+        textItem->setFlag(QGraphicsItem::ItemIsSelectable);
+        // 如果需要创建后即可编辑文本，可以设置：
+        // textItem->setTextInteractionFlags(Qt::TextEditorInteraction);
+
+
+        scene()->addItem(textItem);
+        qDebug() << "Text item added at:" << scenePos << "with text: '测试文字'";
+
+        // 绘制完一个文本框后，可以考虑切换回None模式
+        // setDrawingMode(DrawingMode::None);
+    }
+}
+
+
+
+
+// 处理矩形模式下的鼠标按下事件
+void GraphicsToolView::handleRectangleModePress(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton) {
+        rectStartPoint = mapToScene(event->pos()); // 记录矩形绘制的起始点
+        isDragging = true; // 开始拖动绘制矩形
+
+        // 初始化预览矩形
+        if (previewRect) {
+            scene()->removeItem(previewRect);
+            delete previewRect;
+            previewRect = nullptr;
+        }
+        // 创建一个大小为0的预览矩形，颜色稍后在move中设置
+        previewRect = new QGraphicsRectItem(QRectF(rectStartPoint, rectStartPoint));
+        QPen pen(drawingColor, 1, Qt::DashLine); // 使用虚线预览
+        previewRect->setPen(pen);
+        // previewRect->setBrush(Qt::transparent); // 可以设置透明画刷或不设置
+        scene()->addItem(previewRect);
+        qDebug() << "Rectangle drawing started at:" << rectStartPoint;
+    }
+}
+
+// 处理矩形模式下的鼠标移动事件
+void GraphicsToolView::handleRectangleModeMove(QMouseEvent *event)
+{
+    if (isDragging && previewRect) {
+        QPointF currentScenePos = mapToScene(event->pos());
+        QRectF newRect = QRectF(rectStartPoint, currentScenePos).normalized(); // 标准化矩形，确保左上角和右下角正确
+        previewRect->setRect(newRect);
+        qDebug() << "Rectangle preview updated to:" << newRect;
+    }
+}
+
+// 处理矩形模式下的鼠标释放事件
+void GraphicsToolView::handleRectangleModeRelease(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton && isDragging) {
+        QPointF currentScenePos = mapToScene(event->pos());
+        QRectF finalRect = QRectF(rectStartPoint, currentScenePos).normalized();
+
+        // 移除预览矩形
+        if (previewRect) {
+            scene()->removeItem(previewRect);
+            delete previewRect;
+            previewRect = nullptr;
+        }
+
+        // 创建最终的矩形项
+        if (finalRect.width() > 0 && finalRect.height() > 0) { // 确保矩形有效
+            QGraphicsRectItem *rectItem = new QGraphicsRectItem(finalRect);
+            QPen pen(drawingColor, 2, Qt::SolidLine); // 最终矩形用实线，颜色和粗细可调
+            rectItem->setPen(pen);
+            // rectItem->setBrush(drawingColor); // 如果需要填充颜色
+            scene()->addItem(rectItem);
+            qDebug() << "Rectangle drawn:" << finalRect << "with color" << drawingColor;
+        } else {
+            qDebug() << "Rectangle too small, not drawn.";
+        }
+
+        isDragging = false;
+        rectStartPoint = QPointF(); // 重置起始点
+        // setDrawingMode(DrawingMode::None); // 绘制完毕后可以切换回None模式
+    }
 }
