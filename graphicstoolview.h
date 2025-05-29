@@ -51,6 +51,13 @@ public slots:
 
 public:
 
+    void setDrawingFillImage(const QString &imagePath); // 新增：设置填充图片
+
+
+    void setDrawingFillColor(const QColor &color); // *** 新增：设置填充颜色 ***
+    QColor currentDrawingFillColor() const; // *** 新增：获取填充颜色 ***
+
+
     // 新增文本模式处理函数
     void handleTextModePress(QMouseEvent *event);
     // 文本模式下，移动和释放可能不需要特殊处理，主要在按下时创建
@@ -173,6 +180,12 @@ private:
 
     // 文本绘制相关 (新增)
     // QPointF textInsertionPoint; // 如果需要预览或更复杂逻辑
+
+    QColor drawingFillColor; // *** 新增：当前填充颜色 ***
+
+    QString fillImagePath; // 填充图片路径
+    QPixmap fillPixmap; // 存储填充图片数据
+
 };
 
 #endif // GRAPHICSTOOLVIEW_H

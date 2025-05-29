@@ -8,6 +8,7 @@
 #include <QPixmap>
 #include <QPainter>
 #include "colorselectorpopup.h"
+#include "color_selector_popup_fill.h"
 #include <QGraphicsLineItem>
 #include <QGraphicsRectItem>
 #include "graphicstoolview.h"
@@ -19,6 +20,8 @@ MainWindow::MainWindow(QWidget *parent)
     , graphicsView(new GraphicsToolView(scene,this))
 {
     // ui->setupUi(this);
+    // 连接填充图片选择的信号
+    connect(fillColorPopup, &ColorSelectorPopupFill::backgroundImageSelected, this, &MainWindow::onBackgroundImageSelected);
 
     scene->setSceneRect(-1000, -1000, 2000, 2000);
 
@@ -114,6 +117,27 @@ MainWindow::MainWindow(QWidget *parent)
     colorMenu->addAction(colorWidgetAction);
 
     lineColorButton->setMenu(colorMenu);
+
+    // --- 填充颜色选择器 ---
+    fillColorButton = new QToolButton(this);
+    fillColorButton->setText(QStringLiteral("填充颜色"));
+    fillColorButton->setToolTip(QStringLiteral("选择填充颜色"));
+    fillColorButton->setPopupMode(QToolButton::InstantPopup);
+    fillColorButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    updateFillColorButtonIcon(); // 设置初始图标
+    toolBar->addWidget(fillColorButton);
+
+    fillColorPopup = new ColorSelectorPopupFill(this); // 创建新的弹出实例
+    connect(fillColorPopup, &ColorSelectorPopupFill::colorSelected, this, &MainWindow::onFillColorSelected);
+    connect(fillColorPopup, &ColorSelectorPopupFill::closePopup, this, &MainWindow::closeFillColorPopup);
+
+    QMenu *fillColorMenu = new QMenu(fillColorButton);
+    QWidgetAction *fillColorWidgetAction = new QWidgetAction(fillColorMenu);
+    fillColorWidgetAction->setDefaultWidget(fillColorPopup);
+    fillColorMenu->addAction(fillColorWidgetAction);
+
+    fillColorButton->setMenu(fillColorMenu);
+
 }
 
 void MainWindow::onColorSelected(const QColor &color)
@@ -151,6 +175,59 @@ void MainWindow::updateLineColorButtonIcon()
 
     lineColorButton->setIcon(QIcon(pixmap));
 }
+
+
+
+
+void MainWindow::onFillColorSelected(const QColor &color)
+{
+    // 如果“默认颜色(黑色)”被点击，它会发送黑色。
+    // 如果你希望“默认”表示无填充，可以选择Qt::transparent。
+    // 目前我们直接使用所选颜色，如果选择了黑色，那就是黑色填充。
+    // 如果想实现“无填充”按钮，可以修改 ColorSelectorPopup 或在这里判断 sender 和 color。
+    currentFillColor = color;
+    qDebug() << "MainWindow: Fill Color selected -" << currentFillColor.name();
+    if(graphicsView) {
+        graphicsView->setDrawingFillColor(currentFillColor); // 设置 GraphicsView 的填充颜色
+    }
+    updateFillColorButtonIcon(); // 更新按钮图标
+    closeFillColorPopup(); // 选择后关闭弹窗
+}
+
+void MainWindow::closeFillColorPopup()
+{
+    if (fillColorButton && fillColorButton->menu()) {
+        fillColorButton->menu()->hide();
+    }
+}
+
+void MainWindow::updateFillColorButtonIcon()
+{
+    if (!fillColorButton) return;
+
+    int iconSize = 16;
+    QPixmap pixmap(iconSize, iconSize);
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+
+    if (currentFillColor.isValid() && currentFillColor.alpha() != 0) {
+        // 如果是有效且非透明色，直接填充
+        pixmap.fill(Qt::transparent); // 先透明
+        painter.setBrush(currentFillColor);
+        painter.setPen(Qt::gray); // 加个边框看得清楚点
+        painter.drawRect(0, 0, iconSize - 1, iconSize - 1);
+    } else {
+        // 如果是无效或透明色，显示白色背景加红线 (代表无填充)
+        pixmap.fill(Qt::white);
+        painter.setPen(Qt::gray);
+        painter.drawRect(0, 0, iconSize - 1, iconSize - 1);
+        painter.setPen(QPen(Qt::red, 1));
+        painter.drawLine(1, 1, iconSize - 2, iconSize - 2); // 画一条红色的斜线
+    }
+
+    fillColorButton->setIcon(QIcon(pixmap));
+}
+
 
 void MainWindow::graphManagementWindow() {
     GraphManager *newWindow = new GraphManager(this);
@@ -237,4 +314,14 @@ void MainWindow::initMenu(){
 MainWindow::~MainWindow()
 {
     delete ui;
+}
+
+
+void MainWindow::onBackgroundImageSelected(const QString &imagePath)
+{
+    qDebug() << "Background image selected:" << imagePath;
+    currentFillImagePath = imagePath;
+    if (graphicsView) {
+        graphicsView->setDrawingFillImage(imagePath); // 假设 GraphicsToolView 有这个方法
+    }
 }

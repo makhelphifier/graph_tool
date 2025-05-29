@@ -32,6 +32,9 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         editablelineitem.h editablelineitem.cpp
         handleitem.h handleitem.cpp
         editablepolylineitem.h editablepolylineitem.cpp
+        color_selector_popup_fill.h color_selector_popup_fill.cpp
+        background_image_selector_dialog.h background_image_selector_dialog.cpp
+
 
     )
 # Define target properties for Android with Qt 6 as:
