@@ -34,6 +34,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         editablepolylineitem.h editablepolylineitem.cpp
         color_selector_popup_fill.h color_selector_popup_fill.cpp
         background_image_selector_dialog.h background_image_selector_dialog.cpp
+        custom_rect_item.h custom_rect_item.cpp
 
 
     )

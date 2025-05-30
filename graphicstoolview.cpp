@@ -1,5 +1,7 @@
 #include "graphicstoolview.h"
 #include "editablelineitem.h"
+#include "custom_rect_item.h"
+
 #include <QMouseEvent>
 #include <QKeyEvent>
 #include <QApplication>
@@ -1204,8 +1206,11 @@ void GraphicsToolView::handleRectangleModeMove(QMouseEvent *event)
 }
 
 // 处理矩形模式鼠标释放
+
 void GraphicsToolView::handleRectangleModeRelease(QMouseEvent *event)
 {
+    qDebug() << "handleRectangleModeRelease";
+    qDebug() << fillImagePath << "===fillImagePath";
     if (event->button() == Qt::LeftButton && isDragging) {
         QPointF currentScenePos = mapToScene(event->pos());
         QRectF finalRect = QRectF(rectStartPoint, currentScenePos).normalized();
@@ -1217,20 +1222,20 @@ void GraphicsToolView::handleRectangleModeRelease(QMouseEvent *event)
         }
 
         if (finalRect.width() > 0 && finalRect.height() > 0) {
-            QGraphicsRectItem *rectItem = new QGraphicsRectItem(finalRect);
+            CustomRectItem *rectItem = new CustomRectItem(finalRect); // 使用自定义矩形项
 
             QPen pen(drawingColor, 2, Qt::SolidLine);
             rectItem->setPen(pen);
             // 优先使用图片填充，如果没有则使用颜色填充
             if (!fillImagePath.isEmpty() && !fillPixmap.isNull()) {
+                // 缩放图片到矩形大小
                 QPixmap scaledPixmap = fillPixmap.scaled(finalRect.size().toSize(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-                QBrush brush(scaledPixmap); // 使用图片作为纹理填充
-                rectItem->setBrush(brush);
+                rectItem->setFillPixmap(scaledPixmap); // 设置填充图片
+                qDebug() << "使用图片填充，矩形大小:" << finalRect.size() << "图片大小:" << scaledPixmap.size();
             } else {
                 rectItem->setBrush(QBrush(drawingFillColor)); // 否则使用颜色填充
             }
             scene()->addItem(rectItem);
-
         } else {
             qDebug() << "矩形过小, 未绘制";
         }
