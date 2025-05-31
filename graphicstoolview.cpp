@@ -1206,6 +1206,10 @@ void GraphicsToolView::handleRectangleModeMove(QMouseEvent *event)
 // 处理矩形模式鼠标释放
 void GraphicsToolView::handleRectangleModeRelease(QMouseEvent *event)
 {
+
+    qDebug()<<"handleRectangleModeRelease";
+    qDebug()<<fillImagePath;
+
     if (event->button() == Qt::LeftButton && isDragging) {
         QPointF currentScenePos = mapToScene(event->pos());
         QRectF finalRect = QRectF(rectStartPoint, currentScenePos).normalized();
