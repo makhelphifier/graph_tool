@@ -21,7 +21,6 @@ MainWindow::MainWindow(QWidget *parent)
 {
     // ui->setupUi(this);
     // 连接填充图片选择的信号
-    connect(fillColorPopup, &ColorSelectorPopupFill::backgroundImageSelected, this, &MainWindow::onBackgroundImageSelected);
 
     scene->setSceneRect(-1000, -1000, 2000, 2000);
 
@@ -130,6 +129,7 @@ MainWindow::MainWindow(QWidget *parent)
     fillColorPopup = new ColorSelectorPopupFill(this); // 创建新的弹出实例
     connect(fillColorPopup, &ColorSelectorPopupFill::colorSelected, this, &MainWindow::onFillColorSelected);
     connect(fillColorPopup, &ColorSelectorPopupFill::closePopup, this, &MainWindow::closeFillColorPopup);
+    connect(fillColorPopup, &ColorSelectorPopupFill::backgroundImageSelected, this, &MainWindow::onBackgroundImageSelected);
 
     QMenu *fillColorMenu = new QMenu(fillColorButton);
     QWidgetAction *fillColorWidgetAction = new QWidgetAction(fillColorMenu);

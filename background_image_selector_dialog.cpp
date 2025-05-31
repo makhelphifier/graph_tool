@@ -3,6 +3,7 @@
 #include <QImage>
 #include <QPixmap>
 #include <QDebug>
+#include <QSettings>
 
 BackgroundImageSelectorDialog::BackgroundImageSelectorDialog(QWidget *parent)
     : QDialog(parent)
@@ -42,7 +43,48 @@ BackgroundImageSelectorDialog::BackgroundImageSelectorDialog(QWidget *parent)
 
     mainLayout->addLayout(buttonLayout);
     setLayout(mainLayout);
+
+    // 加载保存的图片列表
+    loadImageList();
+
 }
+
+void BackgroundImageSelectorDialog::loadImageList()
+{
+    // 使用 QSettings 加载保存的图片路径
+    QSettings settings("MyApp", "BackgroundImages");
+    imagePaths = settings.value("imagePaths", QStringList()).toStringList();
+
+    // 清空当前列表
+    imageListWidget->clear();
+
+    // 将保存的图片路径添加到列表中
+    for (const QString &filePath : imagePaths) {
+        QPixmap pixmap(filePath);
+        if (!pixmap.isNull()) {
+            // 缩放图片以适应缩略图大小
+            QPixmap scaledPixmap = pixmap.scaled(100, 100, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            QListWidgetItem *item = new QListWidgetItem(QIcon(scaledPixmap), filePath.split('/').last());
+            item->setData(Qt::UserRole, filePath); // 存储完整路径
+            imageListWidget->addItem(item);
+        } else {
+            qDebug() << "无法加载图片（可能文件已删除或移动）:" << filePath;
+            // 可以选择从列表中移除无效路径，但这里暂时保留以便用户了解
+        }
+    }
+    qDebug() << "加载图片列表，数量:" << imagePaths.size();
+}
+
+void BackgroundImageSelectorDialog::saveImageList()
+{
+    // 使用 QSettings 保存图片路径列表
+    QSettings settings("MyApp", "BackgroundImages");
+    settings.setValue("imagePaths", imagePaths);
+    qDebug() << "保存图片列表，数量:" << imagePaths.size();
+}
+
+
+
 
 void BackgroundImageSelectorDialog::onUploadButtonClicked()
 {
