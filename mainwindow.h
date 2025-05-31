@@ -3,12 +3,12 @@
 
 #include <QMainWindow>
 #include <QLabel>
-#include "newimagedialog.h"
+#include "new_image_dialog.h"
 #include <QColor> // *** 新增：包含 QColor ***
 #include <QGraphicsView> // Include QGraphicsView
 #include <QGraphicsScene> // Include QGraphicsScene
 #include <QActionGroup>   // For managing tool actions
-#include "graphicstoolview.h"
+#include "graphics_tool_view.h"
 #include <QToolButton>
 class ColorSelectorPopup; // *** 新增 ***
 

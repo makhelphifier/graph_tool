@@ -1,5 +1,5 @@
-#ifndef HANDLEITEM_H
-#define HANDLEITEM_H
+#ifndef HANDLE_ITEM_H
+#define HANDLE_ITEM_H
 
 #include <QGraphicsEllipseItem>
 #include <QGraphicsItem>
@@ -17,4 +17,4 @@ protected:
     QVariant itemChange(GraphicsItemChange change, const QVariant &value) override;
 };
 
-#endif // HANDLEITEM_H
+#endif // HANDLE_ITEM_H

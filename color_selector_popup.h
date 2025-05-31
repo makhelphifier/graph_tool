@@ -1,5 +1,5 @@
-#ifndef COLORSELECTORPOPUP_H
-#define COLORSELECTORPOPUP_H
+#ifndef COLOR_SELECTOR_POPUP_H
+#define COLOR_SELECTOR_POPUP_H
 
 #include <QWidget>
 #include <QColor>
@@ -49,4 +49,4 @@ private:
 
 };
 
-#endif // COLORSELECTORPOPUP_H
+#endif // COLOR_SELECTOR_POPUP_H

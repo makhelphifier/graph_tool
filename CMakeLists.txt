@@ -17,21 +17,21 @@ set(PROJECT_SOURCES
         mainwindow.cpp
         mainwindow.h
         mainwindow.ui
-        colorselectorpopup.h colorselectorpopup.cpp
+        color_selector_popup.h color_selector_popup.cpp
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(graph_tool
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
-        graphmanager.h graphmanager.cpp
-        newimagedialog.h newimagedialog.cpp
-        colorselectorpopup.h colorselectorpopup.cpp
-        colorframe.h colorframe.cpp
-        graphicstoolview.h graphicstoolview.cpp
-        editablelineitem.h editablelineitem.cpp
-        handleitem.h handleitem.cpp
-        editablepolylineitem.h editablepolylineitem.cpp
+        graph_manager.h graph_manager.cpp
+        new_image_dialog.h new_image_dialog.cpp
+        color_selector_popup.h color_selector_popup.cpp
+        color_frame.h color_frame.cpp
+        graphics_tool_view.h graphics_tool_view.cpp
+        editable_line_item.h editable_line_item.cpp
+        handle_item.h handle_item.cpp
+        editable_polyline_item.h editable_polyline_item.cpp
         color_selector_popup_fill.h color_selector_popup_fill.cpp
         background_image_selector_dialog.h background_image_selector_dialog.cpp
         custom_rect_item.h custom_rect_item.cpp

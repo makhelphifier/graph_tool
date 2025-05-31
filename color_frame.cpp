@@ -1,4 +1,4 @@
-#include "colorframe.h"
+#include "color_frame.h"
 #include <QMouseEvent>
 #include <QString> // 需要包含 QString 以使用 QString::arg
 

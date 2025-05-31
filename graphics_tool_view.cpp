@@ -1,5 +1,5 @@
-#include "graphicstoolview.h"
-#include "editablelineitem.h"
+#include "graphics_tool_view.h"
+#include "editable_line_item.h"
 #include "custom_rect_item.h"
 
 #include <QMouseEvent>
@@ -1206,7 +1206,6 @@ void GraphicsToolView::handleRectangleModeMove(QMouseEvent *event)
 }
 
 // 处理矩形模式鼠标释放
-
 void GraphicsToolView::handleRectangleModeRelease(QMouseEvent *event)
 {
 
@@ -1275,7 +1274,6 @@ QColor GraphicsToolView::currentDrawingColor() const
 {
     return drawingColor;
 }
-
 
 void GraphicsToolView::setDrawingFillImage(const QString &imagePath)
 {

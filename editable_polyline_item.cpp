@@ -1,4 +1,4 @@
-#include "editablepolylineitem.h"
+#include "editable_polyline_item.h"
 #include <QPainter>
 #include <QGraphicsScene>
 #include <QCursor>

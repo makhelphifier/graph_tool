@@ -1,5 +1,5 @@
-#ifndef GRAPHICSTOOLVIEW_H
-#define GRAPHICSTOOLVIEW_H
+#ifndef GRAPHICS_TOOL_VIEW_H
+#define GRAPHICS_TOOL_VIEW_H
 
 #include <QGraphicsView>
 #include <QWidget>
@@ -8,8 +8,8 @@
 #include <QPointF>
 #include <QMouseEvent>
 #include <QKeyEvent>
-#include "colorselectorpopup.h"
-#include "editablepolylineitem.h"
+#include "color_selector_popup.h"
+#include "editable_polyline_item.h"
 #include <QGraphicsEllipseItem> // 新增：包含椭圆项
 #include <QGraphicsPathItem> // 新增：用于绘制路径，包括圆弧
 #include <QPainterPath>      // 新增：用于定义路径
@@ -188,4 +188,4 @@ private:
 
 };
 
-#endif // GRAPHICSTOOLVIEW_H
+#endif // GRAPHICS_TOOL_VIEW_H

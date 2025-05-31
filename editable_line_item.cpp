@@ -1,4 +1,4 @@
-#include "editablelineitem.h"
+#include "editable_line_item.h"
 #include <QGraphicsScene>
 #include <QGraphicsEllipseItem>
 #include <QCursor>

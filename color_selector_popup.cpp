@@ -1,4 +1,4 @@
-#include "colorselectorpopup.h"
+#include "color_selector_popup.h"
 #include <QVBoxLayout>
 #include <QGridLayout>
 #include <QPushButton>
@@ -6,7 +6,7 @@
 #include <QColorDialog>
 #include <QDebug>
 #include <QMouseEvent>
-#include "colorframe.h"
+#include "color_frame.h"
 
 
 ColorSelectorPopup::ColorSelectorPopup(QWidget *parent) : QWidget(parent)

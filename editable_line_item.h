@@ -1,11 +1,11 @@
-#ifndef EDITABLELINEITEM_H   
-#define EDITABLELINEITEM_H
+#ifndef EDITABLE_LINE_ITEM_H
+#define EDITABLE_LINE_ITEM_H
 
 #include <QGraphicsLineItem>
 #include <QGraphicsItem>
 #include <QPointF>
 #include <QVariant>
-#include "handleitem.h"
+#include "handle_item.h"
 
 class EditableLineItem : public QGraphicsLineItem
 {
@@ -42,4 +42,4 @@ private:
     qreal rotationHandleOffset;
 };
 
-#endif // EDITABLELINEITEM_H
+#endif // EDITABLE_LINE_ITEM_H

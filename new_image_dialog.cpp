@@ -1,4 +1,4 @@
-#include "newimagedialog.h"
+#include "new_image_dialog.h"
 #include <QHeaderView>
 #include <QMessageBox>
 #include <QStandardPaths>
@@ -7,7 +7,7 @@
 #include <QJsonArray>
 #include <QFile>
 #include <QDir>
-#include "graphmanager.h"
+#include "graph_manager.h"
 
 NewImageDialog::NewImageDialog(QWidget *parent ) :QDialog(parent){
     setWindowTitle("新建图片窗口");

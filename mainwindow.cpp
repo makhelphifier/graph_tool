@@ -1,17 +1,17 @@
 #include "mainwindow.h"
 #include "./ui_mainwindow.h"
-#include "graphmanager.h"
+#include "graph_manager.h"
 #include <QToolBar>
 #include <QToolButton>
 #include <QMenu>
 #include <QWidgetAction>
 #include <QPixmap>
 #include <QPainter>
-#include "colorselectorpopup.h"
+#include "color_selector_popup.h"
 #include "color_selector_popup_fill.h"
 #include <QGraphicsLineItem>
 #include <QGraphicsRectItem>
-#include "graphicstoolview.h"
+#include "graphics_tool_view.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)

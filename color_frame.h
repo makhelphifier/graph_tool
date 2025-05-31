@@ -1,5 +1,5 @@
-#ifndef COLORFRAME_H
-#define COLORFRAME_H
+#ifndef COLOR_FRAME_H
+#define COLOR_FRAME_H
 
 #include <QFrame>
 #include <QColor>
@@ -21,4 +21,4 @@ private:
     QColor m_color;
 };
 
-#endif // COLORFRAME_H
+#endif // COLOR_FRAME_H

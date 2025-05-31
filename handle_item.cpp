@@ -1,5 +1,5 @@
-#include "handleitem.h"
-#include "editablelineitem.h"
+#include "handle_item.h"
+#include "editable_line_item.h"
 
 QVariant HandleItem::itemChange(GraphicsItemChange change, const QVariant &value) {
     if (change == ItemPositionHasChanged) {

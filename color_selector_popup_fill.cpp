@@ -7,7 +7,7 @@
 #include <QColorDialog>
 #include <QDebug>
 #include <QMouseEvent>
-#include "colorframe.h"
+#include "color_frame.h"
 #include "background_image_selector_dialog.h"
 
 

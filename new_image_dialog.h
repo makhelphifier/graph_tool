@@ -1,5 +1,5 @@
-#ifndef NEWIMAGEDIALOG_H
-#define NEWIMAGEDIALOG_H
+#ifndef NEW_IMAGE_DIALOG_H
+#define NEW_IMAGE_DIALOG_H
 
 #include <QDialog>
 #include <QMainWindow>
@@ -34,4 +34,4 @@ private:
     int imageCount;
 };
 
-#endif // NEWIMAGEDIALOG_H
+#endif // NEW_IMAGE_DIALOG_H

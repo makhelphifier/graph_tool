@@ -1,4 +1,4 @@
-#include "graphmanager.h"
+#include "graph_manager.h"
 
 GraphManager::GraphManager(QWidget *parent)
     : QMainWindow{parent}

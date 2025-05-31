@@ -1,11 +1,11 @@
-#ifndef EDITABLEPOLYLINEITEM_H
-#define EDITABLEPOLYLINEITEM_H
+#ifndef EDITABLE_POLYLINE_ITEM_H
+#define EDITABLE_POLYLINE_ITEM_H
 
 #include <QGraphicsItem>
 #include <QVector>
 #include <QPointF>
 #include <QVariant>
-#include "handleitem.h"
+#include "handle_item.h"
 #include <QPen>
 class EditablePolylineItem : public QGraphicsItem
 {
@@ -40,4 +40,4 @@ private:
 
 };
 
-#endif // EDITABLEPOLYLINEITEM_H
+#endif // EDITABLE_POLYLINE_ITEM_H

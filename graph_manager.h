@@ -1,5 +1,5 @@
-#ifndef GRAPHMANAGER_H
-#define GRAPHMANAGER_H
+#ifndef GRAPH_MANAGER_H
+#define GRAPH_MANAGER_H
 
 #include <QMainWindow>
 #include <QSplitter>
@@ -47,4 +47,4 @@ private:
 signals:
 };
 
-#endif // GRAPHMANAGER_H
+#endif // GRAPH_MANAGER_H
