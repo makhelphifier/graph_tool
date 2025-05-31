@@ -12,6 +12,7 @@
 #include <QGraphicsLineItem>
 #include <QGraphicsRectItem>
 #include "graphics_tool_view.h"
+#include <QSpinBox> // 包含 QSpinBox 头文件
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -137,6 +138,61 @@ MainWindow::MainWindow(QWidget *parent)
     fillColorMenu->addAction(fillColorWidgetAction);
 
     fillColorButton->setMenu(fillColorMenu);
+
+
+    // --- 线条粗细选择器 ---
+    lineThicknessSpinBox = new QSpinBox(this);
+    lineThicknessSpinBox->setMinimum(1);
+    lineThicknessSpinBox->setMaximum(5);
+    lineThicknessSpinBox->setValue(currentLineThickness); // 设置默认值
+    lineThicknessSpinBox->setSuffix(" px");
+    toolBar->addWidget(new QLabel(QStringLiteral("线条粗细:")));
+    toolBar->addWidget(lineThicknessSpinBox);
+    connect(lineThicknessSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, &MainWindow::onLineThicknessChanged);
+    graphicsView->setDrawingPenWidth(currentLineThickness); // 初始化 GraphicsToolView 的线条粗细
+
+
+    // --- 线条样式选择器 ---
+    lineStyleComboBox = new QComboBox(this);
+    lineStyleComboBox->addItem(QStringLiteral("实线"), static_cast<int>(GraphicsToolView::LineStyle::SolidLine));
+    lineStyleComboBox->addItem(QStringLiteral("虚线"), static_cast<int>(GraphicsToolView::LineStyle::DashLine));
+    lineStyleComboBox->addItem(QStringLiteral("点线"), static_cast<int>(GraphicsToolView::LineStyle::DotLine));
+    lineStyleComboBox->addItem(QStringLiteral("虚点线"), static_cast<int>(GraphicsToolView::LineStyle::DashDotLine));
+    lineStyleComboBox->addItem(QStringLiteral("虚点点线"), static_cast<int>(GraphicsToolView::LineStyle::DashDotDotLine));
+    toolBar->addWidget(new QLabel(QStringLiteral("线条样式:")));
+    toolBar->addWidget(lineStyleComboBox);
+    connect(lineStyleComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &MainWindow::onLineStyleChanged);
+    graphicsView->setDrawingLineStyle(GraphicsToolView::LineStyle::SolidLine); // 初始化 GraphicsToolView 的线条样式为实线
+
+
+
+    // --- 对齐按钮 ---
+    toolBar->addSeparator(); // 添加分隔符
+    QPushButton *alignLeftButton = new QPushButton(QStringLiteral("左对齐"));
+    toolBar->addWidget(alignLeftButton);
+    connect(alignLeftButton, &QPushButton::clicked, this, &MainWindow::onAlignLeftTriggered);
+
+    QPushButton *alignRightButton = new QPushButton(QStringLiteral("右对齐"));
+    toolBar->addWidget(alignRightButton);
+    connect(alignRightButton, &QPushButton::clicked, this, &MainWindow::onAlignRightTriggered);
+
+    QPushButton *alignTopButton = new QPushButton(QStringLiteral("顶对齐"));
+    toolBar->addWidget(alignTopButton);
+    connect(alignTopButton, &QPushButton::clicked, this, &MainWindow::onAlignTopTriggered);
+
+    QPushButton *alignBottomButton = new QPushButton(QStringLiteral("底对齐"));
+    toolBar->addWidget(alignBottomButton);
+    connect(alignBottomButton, &QPushButton::clicked, this, &MainWindow::onAlignBottomTriggered);
+
+    QPushButton *alignCenterVerticalButton = new QPushButton(QStringLiteral("垂直居中"));
+    toolBar->addWidget(alignCenterVerticalButton);
+    connect(alignCenterVerticalButton, &QPushButton::clicked, this, &MainWindow::onAlignCenterVerticalTriggered);
+
+    QPushButton *alignCenterHorizontalButton = new QPushButton(QStringLiteral("水平居中"));
+    toolBar->addWidget(alignCenterHorizontalButton);
+    connect(alignCenterHorizontalButton, &QPushButton::clicked, this, &MainWindow::onAlignCenterHorizontalTriggered);
 
 }
 
@@ -323,5 +379,73 @@ void MainWindow::onBackgroundImageSelected(const QString &imagePath)
     currentFillImagePath = imagePath;
     if (graphicsView) {
         graphicsView->setDrawingFillImage(imagePath); // 假设 GraphicsToolView 有这个方法
+    }
+}
+
+
+// 处理线条粗细变化的槽函数
+void MainWindow::onLineThicknessChanged(int thickness)
+{
+    currentLineThickness = thickness;
+    qDebug() << "MainWindow: Line thickness changed to" << thickness << "px";
+    if (graphicsView) {
+        graphicsView->setDrawingPenWidth(currentLineThickness); // 更新 GraphicsToolView 的线条粗细
+    }
+}
+
+void MainWindow::onLineStyleChanged(int index)
+{
+    GraphicsToolView::LineStyle selectedStyle = static_cast<GraphicsToolView::LineStyle>(lineStyleComboBox->itemData(index).toInt());
+    if(graphicsView){
+        graphicsView->setDrawingLineStyle(selectedStyle);
+    }
+}
+
+
+// 左对齐槽函数
+void MainWindow::onAlignLeftTriggered()
+{
+    if (graphicsView) {
+        graphicsView->alignSelectedItems(GraphicsToolView::AlignLeft);
+    }
+}
+
+// 右对齐槽函数
+void MainWindow::onAlignRightTriggered()
+{
+    if (graphicsView) {
+        graphicsView->alignSelectedItems(GraphicsToolView::AlignRight);
+    }
+}
+
+// 顶对齐槽函数
+void MainWindow::onAlignTopTriggered()
+{
+    if (graphicsView) {
+        graphicsView->alignSelectedItems(GraphicsToolView::AlignTop);
+    }
+}
+
+// 底对齐槽函数
+void MainWindow::onAlignBottomTriggered()
+{
+    if (graphicsView) {
+        graphicsView->alignSelectedItems(GraphicsToolView::AlignBottom);
+    }
+}
+
+// 垂直居中对齐槽函数
+void MainWindow::onAlignCenterVerticalTriggered()
+{
+    if (graphicsView) {
+        graphicsView->alignSelectedItems(GraphicsToolView::AlignCenterVertical);
+    }
+}
+
+// 水平居中对齐槽函数
+void MainWindow::onAlignCenterHorizontalTriggered()
+{
+    if (graphicsView) {
+        graphicsView->alignSelectedItems(GraphicsToolView::AlignCenterHorizontal);
     }
 }

@@ -10,11 +10,11 @@
 #include <QKeyEvent>
 #include "color_selector_popup.h"
 #include "editable_polyline_item.h"
-#include <QGraphicsEllipseItem> // 新增：包含椭圆项
-#include <QGraphicsPathItem> // 新增：用于绘制路径，包括圆弧
-#include <QPainterPath>      // 新增：用于定义路径
-#include <QGraphicsPolygonItem> // 新增：用于绘制多边形
-#include <QGraphicsTextItem> // 新增：用于显示文本
+#include <QGraphicsEllipseItem> // 包含椭圆项
+#include <QGraphicsPathItem> // 用于绘制路径，包括圆弧
+#include <QPainterPath>      // 用于定义路径
+#include <QGraphicsPolygonItem> // 用于绘制多边形
+#include <QGraphicsTextItem> // 用于显示文本
 
 #include <QTime>
 
@@ -36,10 +36,28 @@ public:
         Polygon,
         Text
     };
+    enum class LineStyle { // 线条样式枚举
+        SolidLine,
+        DashLine,
+        DotLine,
+        DashDotLine,
+        DashDotDotLine
+    };
+    enum AlignmentType { //  对齐类型枚举
+        AlignLeft,
+        AlignRight,
+        AlignTop,
+        AlignBottom,
+        AlignCenterVertical,
+        AlignCenterHorizontal
+    };
     GraphicsToolView(QGraphicsScene *scene, QWidget *parent = nullptr);
     void setDrawingMode(DrawingMode mode);
     void setDrawingColor(const QColor &color); // 设置当前绘图颜色
     QColor currentDrawingColor() const; // 获取当前绘图颜色
+    void setDrawingPenWidth(int width); // 设置当前绘图线条粗细
+    void setDrawingLineStyle(LineStyle style); // 设置当前绘图线条样式
+    void alignSelectedItems(AlignmentType type); //  对齐选定项
 
 
     void applyColorToSelectedItems(const QColor &color);
@@ -51,35 +69,35 @@ public slots:
 
 public:
 
-    void setDrawingFillImage(const QString &imagePath); // 新增：设置填充图片
+    void setDrawingFillImage(const QString &imagePath); // 设置填充图片
 
 
-    void setDrawingFillColor(const QColor &color); // *** 新增：设置填充颜色 ***
-    QColor currentDrawingFillColor() const; // *** 新增：获取填充颜色 ***
+    void setDrawingFillColor(const QColor &color); // *** 设置填充颜色 ***
+    QColor currentDrawingFillColor() const; // *** 获取填充颜色 ***
 
 
-    // 新增文本模式处理函数
+    // 文本模式处理函数
     void handleTextModePress(QMouseEvent *event);
     // 文本模式下，移动和释放可能不需要特殊处理，主要在按下时创建
 
 
-    // 新增多边形模式处理函数
+    // 多边形模式处理函数
     void handlePolygonModePress(QMouseEvent *event);
     void handlePolygonModeMove(QMouseEvent *event);
     void finishPolygon(); // 结束多边形绘制 (可能与折线共用部分逻辑)
 
 
-    // 新增圆弧模式处理函数
+    // 圆弧模式处理函数
     void handleArcModePress(QMouseEvent *event);
     void handleArcModeMove(QMouseEvent *event);
     void handleArcModeRelease(QMouseEvent *event); // 第三次点击可以视为释放来完成
 
 
-    // 新增矩形模式处理函数
+    // 矩形模式处理函数
     void handleRectangleModePress(QMouseEvent *event);
     void handleRectangleModeMove(QMouseEvent *event);
     void handleRectangleModeRelease(QMouseEvent *event);
-    // 新增椭圆模式处理函数
+    // 椭圆模式处理函数
     void handleEllipseModePress(QMouseEvent *event);
     void handleEllipseModeMove(QMouseEvent *event);
     void handleEllipseModeRelease(QMouseEvent *event);
@@ -89,11 +107,13 @@ public:
     void wheelEvent(QWheelEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
+    void mouseDoubleClickEvent(QMouseEvent *event) override;
+
     void keyPressEvent(QKeyEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
     void keyReleaseEvent(QKeyEvent *event) override;
-    void handlePolylineModePress(QMouseEvent *event); // 新增折线模式处理
-    void handlePolylineModeMove(QMouseEvent *event);  // 新增折线模式移动处理
+    void handlePolylineModePress(QMouseEvent *event); // 折线模式处理
+    void handlePolylineModeMove(QMouseEvent *event);  // 折线模式移动处理
     void finishPolyline(); // 结束折线绘制
     bool checkHandleHit(const QPointF &scenePos); // 更新以支持折线端点
 
@@ -109,10 +129,12 @@ public:
     void handleGroupRelease();
 
     void updateCursorBasedOnPosition(const QPointF &scenePos);
-    void mouseDoubleClickEvent(QMouseEvent *event);
     void updatePolylinePreview(const QPointF &currentMousePos);
 private:
     QColor drawingColor; // 当前绘图颜色
+    int drawingPenWidth; // 当前绘图线条粗细
+    LineStyle drawingLineStyle; // 新增: 当前绘图线条样式
+
     ColorSelectorPopup *colorSelector; // 颜色选择器弹窗
 
     bool isCtrlPressedForCopy; // 用于记录拖动时是否按住 Ctrl 键以进行复制
@@ -142,24 +164,24 @@ private:
     QVector<QPointF> polylinePoints; // 存储折线顶点
     EditablePolylineItem *currentPolyline = nullptr; // 当前正在绘制的折线对象
     int draggedHandleIndex;
-    bool closePolylineOnFinish = false; // 新增：是否在结束时闭合折线
+    bool closePolylineOnFinish = false; // 是否在结束时闭合折线
 
     EditableLineItem *previewClosingSegment = nullptr; // 闭合预览线（从鼠标到第一个点） // 新增
 
 
 
     // 矩形绘制相关
-    QGraphicsRectItem *previewRect = nullptr; // 新增：预览矩形
-    QPointF rectStartPoint; // 新增：矩形绘制的起始点
+    QGraphicsRectItem *previewRect = nullptr; // 预览矩形
+    QPointF rectStartPoint; // 矩形绘制的起始点
 
 
-    // 椭圆绘制相关 (新增)
-    QGraphicsEllipseItem *previewEllipse = nullptr; // 新增：预览椭圆
-    QPointF ellipseStartPoint; // 新增：椭圆绘制的起始点 (与rectStartPoint功能类似，但可以分开管理)
+    // 椭圆绘制相关
+    QGraphicsEllipseItem *previewEllipse = nullptr; // 预览椭圆
+    QPointF ellipseStartPoint; // 椭圆绘制的起始点 (与rectStartPoint功能类似，但可以分开管理)
 
 
 
-    // 圆弧绘制相关 (新增)
+    // 圆弧绘制相关
     enum class ArcDrawingState {
         DefineCenter,     // 定义圆心
         DefineRadiusStart, // 定义半径和起始点
@@ -170,7 +192,7 @@ private:
     QPointF arcRadiusStartPoint;
     QGraphicsPathItem *previewArc = nullptr; // 预览圆弧
 
-    // 多边形绘制相关 (新增)
+    // 多边形绘制相关
     // 注意：多边形绘制逻辑与折线非常相似，可以复用许多变量
     // bool isDrawingPolygon = false; // 可以复用 isDrawingPolyline
     // QVector<QPointF> polygonPoints; // 可以复用 polylinePoints
@@ -178,10 +200,10 @@ private:
     // EditablePolylineItem *currentPolyline = nullptr; // 这个可能需要调整为 QGraphicsPolygonItem
 
 
-    // 文本绘制相关 (新增)
+    // 文本绘制相关
     // QPointF textInsertionPoint; // 如果需要预览或更复杂逻辑
 
-    QColor drawingFillColor; // *** 新增：当前填充颜色 ***
+    QColor drawingFillColor; // *** 当前填充颜色 ***
 
     QString fillImagePath; // 填充图片路径
     QPixmap fillPixmap; // 存储填充图片数据

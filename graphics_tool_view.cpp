@@ -21,6 +21,9 @@ GraphicsToolView::GraphicsToolView(QGraphicsScene *scene, QWidget *parent)
     drawingColor(Qt::black),
     isDrawingPolyline(false),
     draggedHandleIndex(-1),
+    drawingPenWidth(2), //  初始化线条粗细为2
+    drawingLineStyle(LineStyle::SolidLine), // 初始化线条样式为实线
+
     closePolylineOnFinish(false),
     previewClosingSegment(nullptr),
     previewRect(nullptr),
@@ -358,6 +361,8 @@ void GraphicsToolView::handlePolylineModePress(QMouseEvent *event)
             currentPolyline = new EditablePolylineItem(polylinePoints);
             QPen pen = currentPolyline->pen();
             pen.setColor(drawingColor);
+            pen.setWidth(drawingPenWidth);
+            pen.setStyle(Qt::PenStyle(drawingLineStyle));
             currentPolyline->setPen(pen);
             scene()->addItem(currentPolyline);
             qDebug() << "更新折线, 点数:" << polylinePoints.size();
@@ -371,7 +376,8 @@ void GraphicsToolView::handlePolylineModePress(QMouseEvent *event)
         previewLine = new EditableLineItem(polylinePoints.last(), scenePos);
         QPen pen = previewLine->pen();
         pen.setColor(drawingColor);
-        pen.setStyle(Qt::SolidLine);
+        pen.setStyle(Qt::PenStyle(drawingLineStyle));
+        pen.setWidth(drawingPenWidth);
         previewLine->setPen(pen);
         scene()->addItem(previewLine);
     }
@@ -413,7 +419,8 @@ void GraphicsToolView::updatePolylinePreview(const QPointF& currentMousePos)
         previewLine = new EditableLineItem(lastPoint, effectiveMousePos);
         QPen pen = previewLine->pen();
         pen.setColor(drawingColor);
-        pen.setStyle(Qt::SolidLine);
+        pen.setStyle(Qt::PenStyle(drawingLineStyle));
+        pen.setWidth(drawingPenWidth);
         previewLine->setPen(pen);
         scene()->addItem(previewLine);
     }
@@ -425,7 +432,8 @@ void GraphicsToolView::updatePolylinePreview(const QPointF& currentMousePos)
             previewClosingSegment = new EditableLineItem(effectiveMousePos, polylinePoints.first());
             QPen pen = previewClosingSegment->pen();
             pen.setColor(drawingColor);
-            pen.setStyle(Qt::DotLine);
+            pen.setStyle(Qt::PenStyle(drawingLineStyle));
+            pen.setWidth(drawingPenWidth);
             previewClosingSegment->setPen(pen);
             scene()->addItem(previewClosingSegment);
         }
@@ -578,7 +586,8 @@ void GraphicsToolView::handleLineModePress(QMouseEvent *event)
         previewLine = new EditableLineItem(startPoint, startPoint);
         QPen pen = previewLine->pen();
         pen.setColor(drawingColor);
-        pen.setStyle(Qt::SolidLine);
+        pen.setStyle(Qt::PenStyle(drawingLineStyle));
+        pen.setWidth(drawingPenWidth);
         previewLine->setPen(pen);
         previewLine->setSelected(false);
         previewLine->setFlag(QGraphicsItem::ItemIsSelectable, false);
@@ -589,6 +598,8 @@ void GraphicsToolView::handleLineModePress(QMouseEvent *event)
         EditableLineItem *line = new EditableLineItem(startPoint, endPoint);
         QPen pen = line->pen();
         pen.setColor(drawingColor);
+        pen.setStyle(Qt::PenStyle(drawingLineStyle));
+        pen.setWidth(drawingPenWidth);
         line->setPen(pen);
         line->setSelected(false);
         scene()->addItem(previewLine);
@@ -638,10 +649,14 @@ void GraphicsToolView::applyColorToSelectedItems(const QColor &color)
         if (EditableLineItem* editableLine = dynamic_cast<EditableLineItem*>(item)) {
             QPen pen = editableLine->pen();
             pen.setColor(color);
+            pen.setStyle(Qt::PenStyle(drawingLineStyle));
+            pen.setWidth(drawingPenWidth);
             editableLine->setPen(pen);
         } else if (EditablePolylineItem* editablePolyline = dynamic_cast<EditablePolylineItem*>(item)) {
             QPen pen = editablePolyline->pen();
             pen.setColor(color);
+            pen.setStyle(Qt::PenStyle(drawingLineStyle));
+            pen.setWidth(drawingPenWidth);
             editablePolyline->setPen(pen);
         }
     }
@@ -871,6 +886,7 @@ void GraphicsToolView::handleEllipseModePress(QMouseEvent *event)
         }
         previewEllipse = new QGraphicsEllipseItem(QRectF(ellipseStartPoint, ellipseStartPoint));
         QPen pen(drawingColor, 1, Qt::DashLine);
+        pen.setWidth(drawingPenWidth);
         previewEllipse->setPen(pen);
         scene()->addItem(previewEllipse);
         qDebug() << "椭圆绘制开始于:" << ellipseStartPoint;
@@ -903,7 +919,9 @@ void GraphicsToolView::handleEllipseModeRelease(QMouseEvent *event)
 
         if (finalRect.width() > 0 && finalRect.height() > 0) {
             QGraphicsEllipseItem *ellipseItem = new QGraphicsEllipseItem(finalRect);
-            QPen pen(drawingColor, 2, Qt::SolidLine);
+            QPen pen(drawingColor);
+            pen.setWidth(drawingPenWidth);
+            pen.setStyle(Qt::PenStyle(drawingLineStyle));
             ellipseItem->setPen(pen);
             ellipseItem->setBrush(drawingFillColor);
             scene()->addItem(ellipseItem);
@@ -935,6 +953,9 @@ void GraphicsToolView::handleArcModePress(QMouseEvent *event)
         }
         previewArc = new QGraphicsPathItem();
         QPen pen(drawingColor, 1, Qt::DashLine);
+        pen.setWidth(drawingPenWidth);
+        pen.setStyle(Qt::PenStyle(drawingLineStyle));
+
         previewArc->setPen(pen);
         scene()->addItem(previewArc);
 
@@ -972,7 +993,10 @@ void GraphicsToolView::handleArcModePress(QMouseEvent *event)
         finalPath.arcTo(boundingRect, startAngleDegrees, spanAngleDegrees);
 
         QGraphicsPathItem *arcItem = new QGraphicsPathItem(finalPath);
-        QPen pen(drawingColor, 2, Qt::SolidLine);
+        QPen pen(drawingColor, 2);
+        pen.setWidth(drawingPenWidth);
+        pen.setStyle(Qt::PenStyle(drawingLineStyle));
+
         arcItem->setPen(pen);
         scene()->addItem(arcItem);
 
@@ -1052,7 +1076,10 @@ void GraphicsToolView::handleArcModeRelease(QMouseEvent *event)
         finalPath.arcTo(boundingRect, startAngleDegrees, spanAngleDegrees);
 
         QGraphicsPathItem *arcItem = new QGraphicsPathItem(finalPath);
-        QPen pen(drawingColor, 2, Qt::SolidLine);
+        QPen pen(drawingColor, 2);
+        pen.setWidth(drawingPenWidth);
+        pen.setStyle(Qt::PenStyle(drawingLineStyle));
+
         arcItem->setPen(pen);
         scene()->addItem(arcItem);
         qDebug() << "圆弧绘制(释放): 中心" << arcCenterPoint << "半径" << radius
@@ -1083,6 +1110,9 @@ void GraphicsToolView::handlePolygonModePress(QMouseEvent *event)
         }
         previewPolygon = new QGraphicsPolygonItem();
         QPen pen(drawingColor, 1, Qt::DashLine);
+        pen.setWidth(drawingPenWidth);
+        pen.setStyle(Qt::PenStyle(drawingLineStyle));
+
         previewPolygon->setPen(pen);
         scene()->addItem(previewPolygon);
 
@@ -1135,7 +1165,10 @@ void GraphicsToolView::finishPolygon()
         if (polylinePoints.size() >= 3) {
             QPolygonF finalPolygon(polylinePoints);
             QGraphicsPolygonItem *polygonItem = new QGraphicsPolygonItem(finalPolygon);
-            QPen pen(drawingColor, 2, Qt::SolidLine);
+            QPen pen(drawingColor, 2);
+            pen.setWidth(drawingPenWidth);
+            pen.setStyle(Qt::PenStyle(drawingLineStyle));
+
             polygonItem->setPen(pen);
             QBrush brush(drawingFillColor, Qt::SolidPattern);
             polygonItem->setBrush(brush);
@@ -1188,6 +1221,9 @@ void GraphicsToolView::handleRectangleModePress(QMouseEvent *event)
         }
         previewRect = new QGraphicsRectItem(QRectF(rectStartPoint, rectStartPoint));
         QPen pen(drawingColor, 1, Qt::DashLine);
+        pen.setWidth(drawingPenWidth);
+        pen.setStyle(Qt::PenStyle(drawingLineStyle));
+
         previewRect->setPen(pen);
         scene()->addItem(previewRect);
         qDebug() << "矩形绘制开始于:" << rectStartPoint;
@@ -1228,7 +1264,10 @@ void GraphicsToolView::handleRectangleModeRelease(QMouseEvent *event)
         if (finalRect.width() > 0 && finalRect.height() > 0) {
             CustomRectItem *rectItem = new CustomRectItem(finalRect); // 使用自定义矩形项
 
-            QPen pen(drawingColor, 2, Qt::SolidLine);
+            QPen pen(drawingColor, 2);
+            pen.setWidth(drawingPenWidth);
+            pen.setStyle(Qt::PenStyle(drawingLineStyle));
+
             rectItem->setPen(pen);
             // 优先使用图片填充，如果没有则使用颜色填充
             if (!fillImagePath.isEmpty() && !fillPixmap.isNull()) {
@@ -1288,3 +1327,84 @@ void GraphicsToolView::setDrawingFillImage(const QString &imagePath)
         fillPixmap = QPixmap(); // 清空图片数据
     }
 }
+
+
+// 设置线条粗细
+void GraphicsToolView::setDrawingPenWidth(int width)
+{
+    drawingPenWidth = width;
+    qDebug() << "线条粗细设为:" << width;
+}
+
+// 设置线条样式
+void GraphicsToolView::setDrawingLineStyle(LineStyle style)
+{
+    drawingLineStyle = style;
+}
+
+
+//  对齐选定项
+void GraphicsToolView::alignSelectedItems(AlignmentType type)
+{
+    if (selectedItems.isEmpty()) {
+        qDebug() << "没有选中的图形项进行对齐。";
+        return;
+    }
+
+    // 计算选中项的共同边界矩形
+    QRectF unionRect;
+    for (QGraphicsItem *item : selectedItems) {
+        if (unionRect.isNull()) {
+            unionRect = item->sceneBoundingRect();
+        } else {
+            unionRect = unionRect.united(item->sceneBoundingRect());
+        }
+    }
+
+    qDebug() << "对齐类型:" << type;
+    qDebug() << "选中项共同边界矩形:" << unionRect;
+
+    for (QGraphicsItem *item : selectedItems) {
+        // 将项的当前位置转换为场景坐标
+        QPointF currentScenePos = item->scenePos();
+        QRectF itemRect = item->sceneBoundingRect();
+        QPointF newScenePos = currentScenePos;
+
+        switch (type) {
+        case AlignLeft:
+            newScenePos.setX(unionRect.left() - (itemRect.left() - currentScenePos.x()));
+            break;
+        case AlignRight:
+            newScenePos.setX(unionRect.right() - itemRect.width() - (itemRect.left() - currentScenePos.x()));
+            break;
+        case AlignTop:
+            newScenePos.setY(unionRect.top() - (itemRect.top() - currentScenePos.y()));
+            break;
+        case AlignBottom:
+            newScenePos.setY(unionRect.bottom() - itemRect.height() - (itemRect.top() - currentScenePos.y()));
+            break;
+        case AlignCenterVertical:
+            newScenePos.setY(unionRect.center().y() - itemRect.height() / 2.0 - (itemRect.top() - currentScenePos.y()));
+            break;
+        case AlignCenterHorizontal:
+            newScenePos.setX(unionRect.center().x() - itemRect.width() / 2.0 - (itemRect.left() - currentScenePos.x()));
+            break;
+        }
+
+        // 设置项的新位置 (场景坐标)
+        item->setPos(newScenePos);
+        qDebug() << "项" << item << "新位置:" << newScenePos;
+    }
+    scene()->update(); // 强制场景更新
+}
+
+
+
+
+
+
+
+
+
+
+
