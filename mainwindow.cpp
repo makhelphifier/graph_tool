@@ -13,7 +13,12 @@
 #include <QGraphicsRectItem>
 #include "graphics_tool_view.h"
 #include <QSpinBox> // 包含 QSpinBox 头文件
-
+#include <QFileDialog>
+#include <QtSvg/QSvgGenerator>
+#include <QPainter>
+#include <QtSvg/QSvgRenderer>     //
+#include <QGraphicsSvgItem>
+#include <QMessageBox>         //  (用于提示信息)
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
@@ -310,7 +315,9 @@ void MainWindow::initMenu(){
     QAction *openAction = fileMenu->addAction(tr("打开(&O)"));openAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_O));
     QAction *saveAction = fileMenu->addAction(tr("保存"));saveAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_S));
     QAction *exportAction = fileMenu->addAction(tr("导出..."));exportAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
+    QAction *exportSvgAction = fileMenu->addAction(tr("导出为SVG...")); //
     QAction *importAction = fileMenu->addAction(tr("导入..."));importAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_I));
+    QAction *importSvgAction = fileMenu->addAction(tr("导入SVG...")); //
     fileMenu->addSeparator();
     QAction *graphManagementAction = fileMenu->addAction(tr("图管理(&T)..."));graphManagementAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_G));
     QAction *symboManagementlAction = fileMenu->addAction(tr("符号管理(&M)..."));symboManagementlAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_M));
@@ -364,6 +371,8 @@ void MainWindow::initMenu(){
     connect(copyAction, &QAction::triggered, graphicsView, &GraphicsToolView::copySelectedItems);
     // 添加连接：将粘贴动作的 triggered 信号连接到 graphicsView 的 pasteCopiedItems 槽
     connect(pasteAction, &QAction::triggered, graphicsView, &GraphicsToolView::pasteCopiedItems);
+    connect(exportSvgAction, &QAction::triggered, this, &MainWindow::exportAsSvg); //
+    connect(importSvgAction, &QAction::triggered, this, &MainWindow::importSvg); //
 
 }
 
@@ -372,6 +381,106 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
+
+// 文件末尾或合适的位置添加新函数的实现
+void MainWindow::exportAsSvg()
+{
+    if (!scene) {
+        QMessageBox::warning(this, tr("导出错误"), tr("场景无效，无法导出。"));
+        return;
+    }
+
+    QString filePath = QFileDialog::getSaveFileName(this, tr("导出为 SVG"),
+                                                    "", // 默认目录，可以根据需要设置
+                                                    tr("SVG 文件 (*.svg)"));
+
+    if (filePath.isEmpty()) {
+        return; // 用户取消了操作
+    }
+
+    QSvgGenerator generator;
+    generator.setFileName(filePath);
+    generator.setSize(scene->sceneRect().size().toSize()); // 使用场景的矩形大小
+    // 或者使用graphicsView的大小: generator.setSize(graphicsView->viewport()->size());
+    generator.setViewBox(scene->sceneRect()); // 设置SVG的 viewBox
+    generator.setTitle(tr("我的图形"));        // 可选：设置SVG标题
+    generator.setDescription(tr("从Graph Tool导出的SVG文件")); // 可选：设置SVG描述
+
+    QPainter painter;
+    painter.begin(&generator); // 开始将内容绘制到SVG生成器
+
+    // 清除选中状态，避免导出选中框（如果需要的话）
+    // graphicsView->clearSelection(); // 或者 graphicsView->cleanupSelection();
+    // 或者临时取消选中，导出后再恢复，但这比较复杂
+
+    scene->render(&painter);   // 将场景渲染到painter
+
+    painter.end();             // 结束绘制
+
+    QMessageBox::information(this, tr("导出成功"), tr("文件已成功导出为SVG:\n%1").arg(filePath));
+}
+
+
+// 文件末尾或合适的位置添加新函数的实现
+void MainWindow::importSvg()
+{
+    if (!scene) {
+        QMessageBox::warning(this, tr("导入错误"), tr("场景无效，无法导入。"));
+        return;
+    }
+
+    QString filePath = QFileDialog::getOpenFileName(this, tr("导入 SVG 文件"),
+                                                    "", // 默认目录
+                                                    tr("SVG 文件 (*.svg)"));
+
+    if (filePath.isEmpty()) {
+        return; // 用户取消了操作
+    }
+
+    // 可选：询问用户是否清空当前场景
+    // QMessageBox::StandardButton reply;
+    // reply = QMessageBox::question(this, tr("导入SVG"), tr("是否清空当前画布再导入SVG?"),
+    //                               QMessageBox::Yes|QMessageBox::No|QMessageBox::Cancel);
+    // if (reply == QMessageBox::Cancel) {
+    //     return;
+    // }
+    // if (reply == QMessageBox::Yes) {
+    //     scene->clear();
+    //     // 你可能还需要重置视图的一些状态，如果 clear() 不够的话
+    //     // 例如，如果 displayNewImage 中有其他重置逻辑
+    //     QPixmap blankImage(800, 600); // 或者使用graphicsView的当前大小
+    //     blankImage.fill(Qt::white);
+    //     // scene->addPixmap(blankImage); // 避免添加一个不可编辑的背景
+    //     graphicsView->setSceneRect(scene->itemsBoundingRect()); // 更新场景矩形
+    // }
+
+
+    // 使用 QGraphicsSvgItem 直接加载
+    QGraphicsSvgItem *svgItem = new QGraphicsSvgItem(filePath);
+
+    if (!svgItem->renderer() || !svgItem->renderer()->isValid()) {
+        QMessageBox::warning(this, tr("导入失败"), tr("无法加载或解析SVG文件:\n%1").arg(filePath));
+        delete svgItem;
+        return;
+    }
+
+    // 使SVG项可选和可移动 (如果需要的话)
+    svgItem->setFlag(QGraphicsItem::ItemIsSelectable, true);
+    svgItem->setFlag(QGraphicsItem::ItemIsMovable, true);
+    // svgItem->setFlag(QGraphicsItem::ItemSendsGeometryChanges, true); // 如果需要精确的边界更新
+
+    // 将SVG项添加到场景中
+    scene->addItem(svgItem);
+
+    // 可选: 将SVG项放置在场景中心或用户可见区域
+    // svgItem->setPos(graphicsView->mapToScene(graphicsView->viewport()->rect().center()) - svgItem->boundingRect().center());
+
+    // 可选: 调整视图以适应新导入的内容
+    // graphicsView->setSceneRect(scene->itemsBoundingRect()); // 更新场景矩形以包含新项目
+    // graphicsView->fitInView(svgItem->boundingRect(), Qt::KeepAspectRatio); // 尝试让导入的SVG适应视图
+
+    QMessageBox::information(this, tr("导入成功"), tr("SVG文件已成功导入场景。"));
+}
 
 void MainWindow::onBackgroundImageSelected(const QString &imagePath)
 {

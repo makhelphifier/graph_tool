@@ -230,7 +230,6 @@ void GraphicsToolView::mouseReleaseEvent(QMouseEvent *event)
 
         isSelectingWithRubberBand = false;
         event->accept(); // 事件已处理
-        setDrawingMode(DrawingMode::None); // 确保回到选择模式
         return;
     }
 

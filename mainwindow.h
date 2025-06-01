@@ -60,6 +60,8 @@ private slots: // *** 私有槽 ***
     void onAlignBottomTriggered(); // 底对齐槽
     void onAlignCenterVerticalTriggered(); // 垂直居中对齐槽
     void onAlignCenterHorizontalTriggered(); // 水平居中对齐槽
+    void exportAsSvg(); //导出为SVG文件的槽函数
+    void importSvg();   //导入SVG文件的槽函数
 
 private:
     Ui::MainWindow *ui;
