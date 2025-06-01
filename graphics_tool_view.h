@@ -15,6 +15,8 @@
 #include <QPainterPath>      // 用于定义路径
 #include <QGraphicsPolygonItem> // 用于绘制多边形
 #include <QGraphicsTextItem> // 用于显示文本
+#include <QGraphicsRectItem> // 包含 QGraphicsRectItem
+#include <QRubberBand> // 包含 QRubberBand
 
 #include <QTime>
 
@@ -207,6 +209,11 @@ private:
 
     QString fillImagePath; // 填充图片路径
     QPixmap fillPixmap; // 存储填充图片数据
+
+
+    QRubberBand *rubberBand = nullptr; // 用于显示选择框
+    QPoint rubberBandOrigin;      // 选择框的起始点
+    bool isSelectingWithRubberBand = false; // 是否正在进行框选
 
 };
 

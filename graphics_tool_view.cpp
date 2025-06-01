@@ -23,7 +23,8 @@ GraphicsToolView::GraphicsToolView(QGraphicsScene *scene, QWidget *parent)
     draggedHandleIndex(-1),
     drawingPenWidth(2), //  初始化线条粗细为2
     drawingLineStyle(LineStyle::SolidLine), // 初始化线条样式为实线
-
+    rubberBand(nullptr), // 初始化 rubberBand
+    isSelectingWithRubberBand(false), // 初始化 isSelectingWithRubberBand
     closePolylineOnFinish(false),
     previewClosingSegment(nullptr),
     previewRect(nullptr),
@@ -117,6 +118,23 @@ void GraphicsToolView::mousePressEvent(QMouseEvent *event)
     bool isCtrlPressed = event->modifiers() & Qt::ControlModifier;
     if (currentMode == DrawingMode::None) {
         qDebug() << "无模式按下";
+        QPointF scenePos = mapToScene(event->pos());
+        QGraphicsItem *itemUnderMouse = scene()->itemAt(scenePos, transform());
+        bool handleHit = checkHandleHit(scenePos); // 检查是否点中控制点
+
+        if (event->button() == Qt::LeftButton && !itemUnderMouse && !handleHit) { // 只有在没有点中item且没有点中handle时才开始框选
+            isSelectingWithRubberBand = true;
+            rubberBandOrigin = event->pos();
+            if (!rubberBand) {
+                rubberBand = new QRubberBand(QRubberBand::Rectangle, this);
+            }
+            rubberBand->setGeometry(QRect(rubberBandOrigin, QSize()));
+            rubberBand->show();
+            qDebug() << "开始框选，起点:" << rubberBandOrigin;
+            event->accept(); // 事件已处理
+            return; // 开始框选，不继续执行下面的 handleNoneModePress
+        }
+        // 如果不是开始框选，则执行原有的None模式处理
         handleNoneModePress(event);
     } else if (currentMode == DrawingMode::Line) {
         qDebug() << "直线模式按下";
@@ -149,6 +167,13 @@ void GraphicsToolView::mouseMoveEvent(QMouseEvent *event)
 {
     QPointF scenePos = mapToScene(event->pos());
     updateCursorBasedOnPosition(scenePos);
+
+    if (isSelectingWithRubberBand && rubberBand) {
+        rubberBand->setGeometry(QRect(rubberBandOrigin, event->pos()).normalized());
+        event->accept();
+        return; // 框选时，不执行其他移动逻辑
+    }
+
     if (currentMode == DrawingMode::Line && !startPoint.isNull() && isDragging) {
         handleLineModeMove(event);
     } else if (currentMode == DrawingMode::Polyline && isDrawingPolyline && isDragging) {
@@ -173,6 +198,42 @@ void GraphicsToolView::mouseMoveEvent(QMouseEvent *event)
 void GraphicsToolView::mouseReleaseEvent(QMouseEvent *event)
 {
     qDebug() << "鼠标释放";
+    if (isSelectingWithRubberBand && rubberBand && event->button() == Qt::LeftButton) {
+        rubberBand->hide();
+        QRect selectionRectView = rubberBand->geometry();
+        QRectF selectionRectScene = mapToScene(selectionRectView).boundingRect();
+
+        qDebug() << "框选结束，选择框 (视图):" << selectionRectView;
+        qDebug() << "框选结束，选择框 (场景):" << selectionRectScene;
+
+        bool isMultiSelect = event->modifiers() & Qt::ControlModifier;
+        if (!isMultiSelect) {
+            cleanupSelection(); // 非多选（Ctrl）时，先清空之前的选择
+        }
+
+        QList<QGraphicsItem*> itemsInRect = scene()->items(selectionRectScene, Qt::IntersectsItemShape);
+        for (QGraphicsItem *item : itemsInRect) {
+            if (dynamic_cast<EditableLineItem*>(item) || dynamic_cast<EditablePolylineItem*>(item) ||
+                dynamic_cast<QGraphicsRectItem*>(item) || dynamic_cast<QGraphicsEllipseItem*>(item) ||
+                dynamic_cast<QGraphicsPathItem*>(item) || dynamic_cast<QGraphicsPolygonItem*>(item) ||
+                dynamic_cast<QGraphicsTextItem*>(item)) { // 只选择我们可操作的图形类型
+                if (!selectedItems.contains(item)) {
+                    selectedItems.append(item);
+                    if (EditableLineItem* el = dynamic_cast<EditableLineItem*>(item)) el->setSelectedState(true);
+                    else if (EditablePolylineItem* ep = dynamic_cast<EditablePolylineItem*>(item)) ep->setSelectedState(true);
+                    // 对于其他类型的 QGraphicsItem，它们没有 setSelectedState，选中状态由QGraphicsView管理
+                    else item->setSelected(true);
+                }
+            }
+        }
+        qDebug() << "框选选中 " << selectedItems.count() << " 个项目。";
+
+        isSelectingWithRubberBand = false;
+        event->accept(); // 事件已处理
+        setDrawingMode(DrawingMode::None); // 确保回到选择模式
+        return;
+    }
+
     if (currentMode == DrawingMode::Line && !startPoint.isNull() && isDragging) {
         // 直线模式释放处理
     } else if (currentMode == DrawingMode::None && draggedHandle) {
@@ -445,22 +506,66 @@ void GraphicsToolView::updatePolylinePreview(const QPointF& currentMousePos)
         }
     }
 }
-
 void GraphicsToolView::handleNoneModePress(QMouseEvent *event)
 {
     QPointF scenePos = mapToScene(event->pos());
-    QGraphicsItem *item = scene()->itemAt(scenePos, transform());
+    // QGraphicsItem *item = scene()->itemAt(scenePos, transform()); // 这行可以移除，itemUnderMouse 在 mousePressEvent 中获取
     qreal tolerance = 10.0;
-    if (checkHandleHit(scenePos)) {
+
+    if (checkHandleHit(scenePos)) { // 优先检查是否点中控制点
+        event->accept();
         return;
     }
-    if (checkSelectedGroupHit(scenePos, tolerance)) {
-        this->isCtrlPressedForCopy = event->modifiers() & Qt::ControlModifier;
-        qDebug() << "Ctrl复制:" << isCtrlPressedForCopy;
-        return;
+
+    // 检查是否点中已选中的图形项以进行拖动
+    // 注意：这里需要区分是单击选中还是开始拖动。
+    // 如果是单击，则执行 handleItemSelection。
+    // 如果是按下并准备拖动已选中的项，则 checkSelectedGroupHit 应该处理。
+    // 框选的逻辑已经提前处理了。
+
+    bool groupHit = false;
+    for (QGraphicsItem* selItem : selectedItems) {
+        QRectF boundingRect = selItem->boundingRect();
+        // 稍微扩大一点边界，方便点击
+        boundingRect.adjust(-tolerance / 2, -tolerance / 2, tolerance / 2, tolerance / 2);
+        if (selItem->mapToScene(boundingRect).boundingRect().contains(scenePos)) {
+            groupHit = true;
+            break;
+        }
     }
+
+    if (groupHit) {
+        // 点中了已选中的某个项目，准备拖动组
+        if (event->button() == Qt::LeftButton) {
+            isDraggingSelectionGroup = true;
+            dragStartPosition = scenePos; // 记录拖动起始点（场景坐标）
+            lastDragPos = scenePos;       // 初始化上次拖动位置
+            this->isCtrlPressedForCopy = event->modifiers() & Qt::ControlModifier;
+            qDebug() << "开始拖动选中组:" << scenePos << "Ctrl状态:" << isCtrlPressedForCopy;
+            event->accept();
+            return;
+        }
+    }
+
+    // 如果没有点中控制点，也没有点中已选中的组（或者不是左键按下），则处理单个项目选择
     handleItemSelection(scenePos, tolerance, event->modifiers() & Qt::ControlModifier);
+    event->accept(); // 标记事件已处理
 }
+// void GraphicsToolView::handleNoneModePress(QMouseEvent *event)
+// {
+//     QPointF scenePos = mapToScene(event->pos());
+//     QGraphicsItem *item = scene()->itemAt(scenePos, transform());
+//     qreal tolerance = 10.0;
+//     if (checkHandleHit(scenePos)) {
+//         return;
+//     }
+//     if (checkSelectedGroupHit(scenePos, tolerance)) {
+//         this->isCtrlPressedForCopy = event->modifiers() & Qt::ControlModifier;
+//         qDebug() << "Ctrl复制:" << isCtrlPressedForCopy;
+//         return;
+//     }
+//     handleItemSelection(scenePos, tolerance, event->modifiers() & Qt::ControlModifier);
+// }
 
 bool GraphicsToolView::checkHandleHit(const QPointF &scenePos)
 {
@@ -800,6 +905,11 @@ void GraphicsToolView::cleanupDrawing()
 void GraphicsToolView::cleanupSelection()
 {
     qDebug() << "清理选中状态";
+    if (isSelectingWithRubberBand && rubberBand) { // 如果正在框选，则取消
+        rubberBand->hide();
+        isSelectingWithRubberBand = false;
+    }
+
     for (QGraphicsItem* item : selectedItems) {
         if (item) {
             if (EditableLineItem* editableLine = dynamic_cast<EditableLineItem*>(item)) {
