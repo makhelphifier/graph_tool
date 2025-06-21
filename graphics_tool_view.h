@@ -69,6 +69,7 @@ public slots:
     void showColorSelector(); // 显示颜色选择器
     void onColorSelected(const QColor &color); // 处理颜色选择信号
 
+    void deleteSelectedItems();
 public:
 
     void setDrawingFillImage(const QString &imagePath); // 设置填充图片

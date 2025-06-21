@@ -371,6 +371,7 @@ void MainWindow::initMenu(){
     connect(copyAction, &QAction::triggered, graphicsView, &GraphicsToolView::copySelectedItems);
     // 添加连接：将粘贴动作的 triggered 信号连接到 graphicsView 的 pasteCopiedItems 槽
     connect(pasteAction, &QAction::triggered, graphicsView, &GraphicsToolView::pasteCopiedItems);
+    connect(deleteAction, &QAction::triggered, graphicsView, &GraphicsToolView::deleteSelectedItems);
     connect(exportSvgAction, &QAction::triggered, this, &MainWindow::exportAsSvg); //
     connect(importSvgAction, &QAction::triggered, this, &MainWindow::importSvg); //
 
